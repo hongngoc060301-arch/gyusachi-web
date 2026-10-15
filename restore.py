@@ -2,7 +2,8 @@ import os
 from pathlib import Path
 import psycopg2
 
-DATABASE_URL = "postgresql://gyusachi_j1ah_user:QATHpWCLNHK4cBbfHZrJsHOJIBrpYFnY@dpg-db8553aj9qps73bmo0kg-a.singapore-postgres.render.com/gyusachi_j1ah"
+DATABASE_URL = ("postgresql://gyusachi_j1ah_user:QATHpWCLNHK4cBbfHZrJsHOJIBrpYFnY@dpg-db8553aj9qps73bmo0kg-a.singapore-postgres.render.com/gyusachi_j1ah"
+                )
 
 conn = psycopg2.connect(DATABASE_URL)
 conn.autocommit = True
