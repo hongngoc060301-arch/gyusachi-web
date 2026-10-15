@@ -15,6 +15,10 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .bar-col:hover .bar { filter: brightness(1.25); }
     input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+    .fld { width: 100%; background: #020617; border: 1px solid #1e293b; border-radius: .75rem; padding: .625rem 1rem; font-size: .875rem; outline: none; color: inherit; }
+    .fld:focus { border-color: #ef4444; }
+    .lbl { display: block; font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .1em; margin-bottom: .25rem; }
+    select.fld option { background: #0f172a; }
   </style>
 </head>
 
@@ -189,6 +193,138 @@
         <p id="mCount" class="text-xs text-slate-500"></p>
       </section>
 
+      <!-- ===== 5. NHÂN VIÊN ===== -->
+      <section id="v-staff" class="hidden space-y-5">
+        <div class="flex flex-wrap items-center gap-3">
+          <h3 class="text-sm font-black uppercase tracking-widest text-slate-300">Nhân viên phục vụ</h3>
+          <div class="flex-1"></div>
+          <button onclick="openStaff()" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-black transition">
+            <i class="fa-solid fa-user-plus mr-2"></i>THÊM NHÂN VIÊN</button>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                <tr><th class="text-left px-4 py-3">Mã</th><th class="text-left px-4 py-3">Nhân viên</th>
+                    <th class="text-left px-4 py-3">Chức vụ</th><th class="text-right px-4 py-3">Số đơn</th>
+                    <th class="text-center px-4 py-3">Trạng thái</th><th class="text-right px-4 py-3">Thao tác</th></tr>
+              </thead>
+              <tbody id="stBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500">Nhân viên đã có lịch sử phục vụ không xoá được, hãy bấm KHOÁ: họ sẽ biến mất khỏi màn hình đăng nhập nhưng hoá đơn cũ vẫn giữ nguyên.</p>
+
+        <div class="grid lg:grid-cols-2 gap-5">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Tài khoản bếp (theo trạm)</h3>
+            <div id="stStations" class="space-y-2"></div>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Đổi mật khẩu</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="lbl">Mật khẩu thu ngân mới</label>
+                <div class="flex gap-2">
+                  <input id="pwCash" type="password" maxlength="30" autocomplete="new-password" class="fld" placeholder="Từ 4 ký tự">
+                  <button onclick="savePw('cashier')" class="px-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm font-bold whitespace-nowrap">LƯU</button>
+                </div>
+              </div>
+              <div class="border-t border-slate-800 pt-4">
+                <label class="lbl">Mật khẩu quản lí</label>
+                <input id="pwMgrCur" type="password" maxlength="30" autocomplete="current-password" class="fld mb-2" placeholder="Mật khẩu hiện tại">
+                <div class="flex gap-2">
+                  <input id="pwMgrNew" type="password" maxlength="30" autocomplete="new-password" class="fld" placeholder="Mật khẩu mới (từ 6 ký tự)">
+                  <button onclick="savePw('manager')" class="px-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm font-bold whitespace-nowrap">LƯU</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 6. ĐẶT BÀN ===== -->
+      <section id="v-booking" class="hidden space-y-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <button data-q="today"    onclick="bkQuick(this.dataset.q)" class="bq chip px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500">Hôm nay</button>
+          <button data-q="tomorrow" onclick="bkQuick(this.dataset.q)" class="bq chip px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500">Ngày mai</button>
+          <button data-q="week"     onclick="bkQuick(this.dataset.q)" class="bq chip px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500">7 ngày tới</button>
+          <button data-q="all"      onclick="bkQuick(this.dataset.q)" class="bq chip px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500">Tất cả sắp tới</button>
+          <input id="bkFrom" type="date" onchange="bkCustom()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs">
+          <span class="text-slate-500 text-xs">→</span>
+          <input id="bkTo" type="date" onchange="bkCustom()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs">
+          <select id="bkStatus" onchange="loadBooking()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs">
+            <option value="">Mọi trạng thái</option>
+            <option value="PENDING">Chờ xác nhận</option>
+            <option value="CONFIRMED">Đã xác nhận</option>
+            <option value="ARRIVED">Đã đến</option>
+            <option value="NO_SHOW">Không đến</option>
+            <option value="CANCELLED">Đã huỷ</option>
+          </select>
+          <div class="flex-1"></div>
+          <button onclick="openRes()" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-black transition">
+            <i class="fa-solid fa-plus mr-2"></i>THÊM ĐẶT BÀN</button>
+        </div>
+        <div id="bkCounts" class="flex flex-wrap gap-2 text-xs"></div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                <tr><th class="text-left px-4 py-3">Giờ</th><th class="text-left px-4 py-3">Khách</th>
+                    <th class="text-right px-4 py-3">Số khách</th><th class="text-left px-4 py-3">Bàn</th>
+                    <th class="text-left px-4 py-3">Ghi chú</th><th class="text-center px-4 py-3">Trạng thái</th>
+                    <th class="text-right px-4 py-3">Thao tác</th></tr>
+              </thead>
+              <tbody id="bkBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500">Khách tự đặt trên website sẽ ở trạng thái "Chờ xác nhận". Đơn do nhân viên nhập (khách gọi điện) được xác nhận luôn.
+          Hai đơn cùng bàn phải cách nhau tối thiểu 2 giờ.</p>
+      </section>
+
+      <!-- ===== 7. BÀN ===== -->
+      <section id="v-tables" class="hidden space-y-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <button data-f="all" onclick="setTblFloor(this.dataset.f)" class="tf chip active px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500">Tất cả</button>
+          <button data-f="1"   onclick="setTblFloor(this.dataset.f)" class="tf chip px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500">Tầng 1</button>
+          <button data-f="2"   onclick="setTblFloor(this.dataset.f)" class="tf chip px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500">Tầng 2</button>
+          <div class="flex-1"></div>
+          <button onclick="openTbl()" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-black transition">
+            <i class="fa-solid fa-plus mr-2"></i>THÊM BÀN</button>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                <tr><th class="text-left px-4 py-3">Mã</th><th class="text-left px-4 py-3">Tên</th>
+                    <th class="text-center px-4 py-3">Tầng</th><th class="text-center px-4 py-3">Loại</th>
+                    <th class="text-right px-4 py-3">Số chỗ</th><th class="text-center px-4 py-3">Đặt sắp tới</th>
+                    <th class="text-center px-4 py-3">Trạng thái</th><th class="text-right px-4 py-3">Thao tác</th></tr>
+              </thead>
+              <tbody id="tbBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500">Bàn mới hiện ngay ở màn hình phục vụ và trang đặt bàn. Bàn đang có khách hoặc có đơn đặt sắp tới thì chưa ẩn được.
+          Bàn đã có hoá đơn thì chỉ ẩn, không xoá.</p>
+      </section>
+
+      <!-- ===== 8. GÓI BUFFET ===== -->
+      <section id="v-packages" class="hidden space-y-5">
+        <div>
+          <h3 class="text-sm font-black uppercase tracking-widest text-slate-300 mb-3">Buffet đồ ăn</h3>
+          <div id="pkFood" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+        <div>
+          <h3 class="text-sm font-black uppercase tracking-widest text-slate-300 mb-3">Buffet nước</h3>
+          <div id="pkDrink" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+        <p class="text-xs text-slate-500">Hoá đơn đã thanh toán giữ nguyên giá cũ. Bàn đang ăn sẽ tính theo giá mới khi thanh toán.
+          Ảnh menu và thẻ giá ở trang khách (index.html) là cố định, không tự đổi theo giá ở đây.</p>
+      </section>
+
     </div>
   </main>
 </div>
@@ -221,6 +357,18 @@
         <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tên món</label>
         <input id="addName" maxlength="150" placeholder="VD: Bò Wagyu nướng"
           class="w-full bg-slate-950 border border-slate-800 focus:border-red-500 outline-none rounded-xl px-4 py-2.5 text-sm">
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Loại món</label>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="addTypeBuf" onclick="setAddType('buf')"
+            class="chip px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm font-bold hover:border-red-500 transition">
+            <i class="fa-solid fa-fire-burner mr-2"></i>BUFFET</button>
+          <button type="button" id="addTypeAla" onclick="setAddType('ala')"
+            class="chip px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm font-bold hover:border-red-500 transition">
+            <i class="fa-solid fa-utensils mr-2"></i>ALACARTE / NƯỚC</button>
+        </div>
       </div>
 
       <div>
@@ -258,6 +406,128 @@
   </div>
 </div>
 
+<!-- ================= NHÂN VIÊN ================= -->
+<div id="staffModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('staffModal')">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-start justify-between">
+      <h4 id="staffTitle" class="text-lg font-black text-white"></h4>
+      <button onclick="hideM('staffModal')" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mt-4 space-y-4">
+      <div><label class="lbl">Họ tên</label><input id="stName" maxlength="100" class="fld" placeholder="VD: Nguyễn Văn A"></div>
+      <div><label class="lbl">Chức vụ</label>
+        <input id="stRole" maxlength="50" list="roleList" class="fld" placeholder="VD: Phục vụ">
+        <datalist id="roleList"><option value="Quản lí"><option value="Phó quản lí"><option value="Giám Sát"><option value="Phục vụ"></datalist>
+      </div>
+      <div><label class="lbl">Ảnh đại diện (đường dẫn, không bắt buộc)</label>
+        <input id="stAvatar" maxlength="200" class="fld" placeholder="/static/images/Ten.png"></div>
+      <div id="stPinBox"><label class="lbl">Mã PIN (4 số)</label>
+        <input id="stPin" maxlength="4" inputmode="numeric" class="fld" placeholder="VD: 1234"></div>
+      <p id="stErr" class="hidden text-sm text-red-400"></p>
+      <div class="flex gap-3 pt-1">
+        <button onclick="hideM('staffModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+        <button onclick="saveStaff()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pinModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('pinModal')">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xs p-6 text-center">
+    <h4 id="pinTitle" class="text-lg font-black text-white"></h4>
+    <p class="text-xs text-slate-400 mt-1">Nhập mã PIN mới gồm 4 chữ số</p>
+    <input id="pinNew" maxlength="4" inputmode="numeric" autocomplete="off"
+      onkeydown="if(event.key==='Enter') savePin()"
+      class="fld mt-4 text-center text-2xl tracking-[.4em]">
+    <p id="pinErr" class="hidden text-sm text-red-400 mt-2"></p>
+    <div class="flex gap-3 mt-4">
+      <button onclick="hideM('pinModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+      <button onclick="savePin()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">ĐỔI PIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ĐẶT BÀN ================= -->
+<div id="resModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('resModal')">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-start justify-between">
+      <h4 class="text-lg font-black text-white">Thêm đơn đặt bàn</h4>
+      <button onclick="hideM('resModal')" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mt-4 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Tên khách</label><input id="rsName" maxlength="100" class="fld"></div>
+        <div><label class="lbl">Số điện thoại</label><input id="rsPhone" maxlength="15" inputmode="tel" class="fld"></div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div><label class="lbl">Số khách</label><input id="rsGuests" type="number" min="1" max="60" value="2" class="fld"></div>
+        <div><label class="lbl">Ngày</label><input id="rsDate" type="date" class="fld"></div>
+        <div><label class="lbl">Giờ</label><input id="rsTime" type="time" min="10:00" max="21:30" value="18:00" class="fld"></div>
+      </div>
+      <div><label class="lbl">Bàn</label><select id="rsTable" class="fld"></select></div>
+      <div><label class="lbl">Ghi chú</label><input id="rsNote" maxlength="300" class="fld" placeholder="VD: sinh nhật, cần ghế trẻ em..."></div>
+      <p id="rsErr" class="hidden text-sm text-red-400"></p>
+      <div class="flex gap-3 pt-1">
+        <button onclick="hideM('resModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+        <button onclick="saveRes()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU ĐƠN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= BÀN ================= -->
+<div id="tblModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('tblModal')">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-start justify-between">
+      <h4 id="tbTitle" class="text-lg font-black text-white"></h4>
+      <button onclick="hideM('tblModal')" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mt-4 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Mã bàn</label><input id="tbId" maxlength="10" class="fld" placeholder="VD: B12"></div>
+        <div><label class="lbl">Tên hiển thị</label><input id="tbName" maxlength="50" class="fld" placeholder="VD: B12"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Tầng</label><select id="tbFloor" class="fld"><option value="1">Tầng 1</option><option value="2">Tầng 2</option></select></div>
+        <div><label class="lbl">Loại</label><select id="tbType" class="fld"><option value="NORMAL">Bàn thường</option><option value="VIP">Phòng VIP</option></select></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Số chỗ tối đa</label><input id="tbCap" type="number" min="1" max="30" class="fld"></div>
+        <div><label class="lbl">Số khách tối thiểu</label><input id="tbMin" type="number" min="1" max="30" value="1" class="fld"></div>
+      </div>
+      <p id="tbErr" class="hidden text-sm text-red-400"></p>
+      <div class="flex gap-3 pt-1">
+        <button onclick="hideM('tblModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+        <button onclick="saveTbl()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= GÓI BUFFET ================= -->
+<div id="pkgModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('pkgModal')">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-start justify-between">
+      <h4 id="pkTitle" class="text-lg font-black text-white"></h4>
+      <button onclick="hideM('pkgModal')" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mt-4 space-y-4">
+      <div><label class="lbl">Giá gói (đ / người)</label>
+        <input id="pkPrice" type="number" min="1000" step="1000" oninput="onPkPrice()" class="fld"></div>
+      <div><label class="lbl">Tên gói</label><input id="pkName" maxlength="100" oninput="pkNameTouched=true" class="fld"></div>
+      <div><label class="lbl">Ngày áp dụng</label>
+        <div id="pkDays" class="flex flex-wrap gap-2"></div>
+        <p class="text-[11px] text-slate-500 mt-2">Không chọn ngày nào (hoặc chọn đủ 7 ngày) = áp dụng mọi ngày.</p></div>
+      <p id="pkWarn" class="hidden text-xs text-amber-400"></p>
+      <p id="pkErr" class="hidden text-sm text-red-400"></p>
+      <div class="flex gap-3 pt-1">
+        <button onclick="hideM('pkgModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+        <button onclick="savePk()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl"></div>
 
 
@@ -266,7 +536,11 @@
     ['overview', 'fa-chart-line',   'Tổng quan'],
     ['report',   'fa-file-invoice-dollar', 'Báo cáo doanh thu'],
     ['dishes',   'fa-ranking-star', 'Thống kê món'],
-    ['menu',     'fa-book-open',    'Thực đơn']
+    ['menu',     'fa-book-open',    'Thực đơn'],
+    ['staff',    'fa-users',        'Nhân viên'],
+    ['booking',  'fa-calendar-check', 'Đặt bàn'],
+    ['tables',   'fa-chair',        'Bàn'],
+    ['packages', 'fa-tags',         'Gói buffet']
   ];
   const METHOD_NAME = { CASH: 'Tiền mặt', CARD: 'Thẻ', TRANSFER: 'Chuyển khoản' };
 
@@ -398,6 +672,10 @@
     if (tab === 'report')   loadReport();
     if (tab === 'dishes')   loadDishes();
     if (tab === 'menu')     loadMenu();
+    if (tab === 'staff')    loadStaff();
+    if (tab === 'booking')  loadBooking();
+    if (tab === 'tables')   loadTables();
+    if (tab === 'packages') loadPackages();
   }
 
 
@@ -647,19 +925,35 @@
 
   // ============ THÊM MÓN ============
   let addPkgIds = new Set();
+  let addType = 'buf';          // 'buf' = buffet | 'ala' = gọi lẻ / nước
 
   function openAdd() {
     if (!MENU) return;
-    const ala = menuTab === 'ala';
-    document.getElementById('addTitle').textContent = ala ? 'Thêm món gọi lẻ / nước' : 'Thêm món vào buffet';
-    document.getElementById('addPriceBox').classList.toggle('hidden', !ala);
-    document.getElementById('addPkgBox').classList.toggle('hidden', ala);
     document.getElementById('addName').value = '';
     document.getElementById('addPrice').value = '';
     document.getElementById('addCatNew').value = '';
     document.getElementById('addError').classList.add('hidden');
 
-    // nhóm: các nhóm đang có + "Nhóm mới"
+    document.getElementById('addStation').innerHTML =
+      MENU.stations.map(st => `<option value="${esc(st.id)}">${esc(st.id)} · ${esc(st.name)}</option>`).join('');
+
+    addPkgIds = new Set();
+    setAddType(menuTab === 'ala' ? 'ala' : 'buf');   // mặc định theo tab đang xem
+    document.getElementById('addModal').classList.remove('hidden');
+    document.getElementById('addName').focus();
+  }
+
+  // Đổi loại món: Buffet -> hiện chọn gói buffet; Alacarte -> hiện ô giá
+  function setAddType(t) {
+    addType = t;
+    const ala = t === 'ala';
+    document.getElementById('addTitle').textContent = ala ? 'Thêm món gọi lẻ / nước' : 'Thêm món vào buffet';
+    document.getElementById('addTypeBuf').classList.toggle('active', !ala);
+    document.getElementById('addTypeAla').classList.toggle('active', ala);
+    document.getElementById('addPriceBox').classList.toggle('hidden', !ala);
+    document.getElementById('addPkgBox').classList.toggle('hidden', ala);
+
+    // nhóm: các nhóm đang có của loại này + "Nhóm mới"
     const order = MENU.category_order;
     const cats = [...new Set((ala ? MENU.alacarte : MENU.buffet).map(x => x.category))].sort((a, b) => {
       const ia = order.indexOf(a), ib = order.indexOf(b);
@@ -669,14 +963,7 @@
       cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('') +
       '<option value="__new__">+ Nhóm mới...</option>';
     onAddCat();
-
-    document.getElementById('addStation').innerHTML =
-      MENU.stations.map(st => `<option value="${esc(st.id)}">${esc(st.id)} · ${esc(st.name)}</option>`).join('');
-
-    addPkgIds = new Set();
     renderAddPkgs();
-    document.getElementById('addModal').classList.remove('hidden');
-    document.getElementById('addName').focus();
   }
 
   function closeAdd() { document.getElementById('addModal').classList.add('hidden'); }
@@ -713,7 +1000,7 @@
   }
 
   async function submitAdd() {
-    const ala = menuTab === 'ala';
+    const ala = addType === 'ala';
     const err = document.getElementById('addError');
     err.classList.add('hidden');
 
@@ -741,9 +1028,436 @@
 
     closeAdd();
     toast('Đã thêm món: ' + body.name.trim(), true);
+    menuTab = addType;          // chuyển sang tab của loại vừa thêm để thấy món
     await loadMenu();
     document.getElementById('mSearch').value = body.name.trim();
     renderMenu();
+  }
+
+
+  // ============ DÙNG CHUNG CHO CÁC TAB MỚI ============
+  function showM(id) { document.getElementById(id).classList.remove('hidden'); }
+  function hideM(id) { document.getElementById(id).classList.add('hidden'); }
+  function formErr(id, msg) {
+    const e = document.getElementById(id);
+    if (!msg) { e.classList.add('hidden'); return; }
+    e.textContent = msg; e.classList.remove('hidden');
+  }
+  function badge(text, cls) {
+    return `<span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${cls}">${esc(text)}</span>`;
+  }
+  const B_RED = 'border-red-700 text-red-300 hover:bg-red-700 hover:text-white';
+  const B_GRAY = 'border-slate-600 text-slate-300 hover:bg-slate-700';
+  const B_GREEN = 'border-emerald-700 text-emerald-300 hover:bg-emerald-700 hover:text-white';
+  const B_AMBER = 'border-amber-700 text-amber-300 hover:bg-amber-700 hover:text-white';
+  function btn(label, cls, fn, id) {
+    return `<button data-id="${esc(id)}" onclick="${fn}(this.dataset.id)"
+      class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${cls}">${label}</button>`;
+  }
+  const AVATAR_FALLBACK = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1e293b"/>' +
+    '<circle cx="20" cy="15" r="7" fill="#64748b"/><path d="M6 38c0-8 6-13 14-13s14 5 14 13z" fill="#64748b"/></svg>');
+
+
+  // ============ 5. NHÂN VIÊN ============
+  let STAFF = null, editStaffId = null, pinTarget = null;
+
+  async function loadStaff() {
+    const r = await api('/api/manager/staff');
+    if (!r.staffs) return;
+    STAFF = r;
+    renderStaff();
+  }
+
+  function renderStaff() {
+    document.getElementById('stBody').innerHTML = STAFF.staffs.map(s => `
+      <tr class="border-t border-slate-800 ${s.is_active ? '' : 'opacity-50'}">
+        <td class="px-4 py-3 text-slate-400">${esc(s.id)}</td>
+        <td class="px-4 py-3"><div class="flex items-center gap-3">
+          <img src="${esc(s.avatar || '')}" alt="" class="w-9 h-9 rounded-full object-cover bg-slate-800"
+               onerror="this.onerror=null;this.src=AVATAR_FALLBACK">
+          <span class="font-bold text-white">${esc(s.name)}</span></div></td>
+        <td class="px-4 py-3 text-slate-300">${esc(s.role)}</td>
+        <td class="px-4 py-3 text-right text-slate-400">${s.orders}</td>
+        <td class="px-4 py-3 text-center">${s.busy ? badge('Đang phục vụ bàn', 'bg-amber-950 text-amber-300')
+            : s.is_active ? badge('Đang làm', 'bg-emerald-950 text-emerald-300') : badge('Đã khoá', 'bg-slate-800 text-slate-400')}</td>
+        <td class="px-4 py-3"><div class="flex flex-wrap justify-end gap-1.5">
+          ${btn('Sửa', B_GRAY, 'openStaff', s.id)}
+          ${btn('Đổi PIN', B_GRAY, 'pinStaff', s.id)}
+          ${btn(s.is_active ? 'Khoá' : 'Mở khoá', s.is_active ? B_AMBER : B_GREEN, 'toggleStaff', s.id)}
+          ${s.orders === 0 ? btn('Xoá', B_RED, 'delStaff', s.id) : ''}
+        </div></td>
+      </tr>`).join('') || '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">Chưa có nhân viên.</td></tr>';
+
+    document.getElementById('stStations').innerHTML = STAFF.stations.map(s => `
+      <div class="flex items-center justify-between gap-3 text-sm">
+        <div class="min-w-0"><span class="font-bold text-white">${esc(s.id)}</span>
+          <span class="text-slate-300"> · ${esc(s.name)}</span></div>
+        ${btn('Đổi PIN', B_GRAY, 'pinStation', s.id)}
+      </div>`).join('');
+  }
+
+  function openStaff(id) {
+    const s = id ? STAFF.staffs.find(x => x.id === id) : null;
+    editStaffId = s ? s.id : null;
+    document.getElementById('staffTitle').textContent = s ? 'Sửa nhân viên ' + s.id : 'Thêm nhân viên';
+    document.getElementById('stName').value = s ? s.name : '';
+    document.getElementById('stRole').value = s ? s.role : 'Phục vụ';
+    document.getElementById('stAvatar').value = s ? (s.avatar || '') : '';
+    document.getElementById('stPin').value = '';
+    document.getElementById('stPinBox').classList.toggle('hidden', !!s);
+    formErr('stErr');
+    showM('staffModal');
+    document.getElementById('stName').focus();
+  }
+
+  async function saveStaff() {
+    const body = { name: document.getElementById('stName').value, role: document.getElementById('stRole').value,
+                   avatar: document.getElementById('stAvatar').value };
+    let url = '/api/manager/staff/new';
+    if (editStaffId) url = '/api/manager/staff/' + encodeURIComponent(editStaffId);
+    else body.pin = document.getElementById('stPin').value;
+    const r = await api(url, body);
+    if (!r.success) { formErr('stErr', r.message || 'Không lưu được'); return; }
+    hideM('staffModal');
+    toast(editStaffId ? 'Đã cập nhật nhân viên' : 'Đã thêm nhân viên (mã ' + r.id + ')', true);
+    loadStaff();
+  }
+
+  function pinStaff(id) {
+    const s = STAFF.staffs.find(x => x.id === id);
+    pinTarget = { kind: 'staff', id: id };
+    openPinBox('Đổi PIN: ' + s.name);
+  }
+  function pinStation(id) {
+    const s = STAFF.stations.find(x => x.id === id);
+    pinTarget = { kind: 'station', id: id };
+    openPinBox('Đổi PIN: ' + s.name);
+  }
+  function openPinBox(title) {
+    document.getElementById('pinTitle').textContent = title;
+    document.getElementById('pinNew').value = '';
+    formErr('pinErr');
+    showM('pinModal');
+    document.getElementById('pinNew').focus();
+  }
+  async function savePin() {
+    const pin = document.getElementById('pinNew').value;
+    const url = pinTarget.kind === 'staff'
+      ? '/api/manager/staff/' + encodeURIComponent(pinTarget.id)
+      : '/api/manager/station/' + encodeURIComponent(pinTarget.id) + '/pin';
+    const r = await api(url, { pin: pin });
+    if (!r.success) { formErr('pinErr', r.message || 'Không đổi được PIN'); return; }
+    hideM('pinModal');
+    toast('Đã đổi PIN', true);
+  }
+
+  async function toggleStaff(id) {
+    const s = STAFF.staffs.find(x => x.id === id);
+    if (s.is_active && !confirm('Khoá tài khoản ' + s.name + '? Nhân viên sẽ không đăng nhập được nữa.')) return;
+    const r = await api('/api/manager/staff/' + encodeURIComponent(id), { is_active: !s.is_active });
+    if (!r.success) { toast(r.message || 'Không đổi được', false); return; }
+    toast(s.is_active ? 'Đã khoá ' + s.name : 'Đã mở khoá ' + s.name, true);
+    loadStaff();
+  }
+  async function delStaff(id) {
+    const s = STAFF.staffs.find(x => x.id === id);
+    if (!confirm('Xoá hẳn nhân viên ' + s.name + '?')) return;
+    const r = await api('/api/manager/staff/' + encodeURIComponent(id) + '/delete', {});
+    if (!r.success) { toast(r.message || 'Không xoá được', false); return; }
+    toast('Đã xoá ' + s.name, true);
+    loadStaff();
+  }
+
+  async function savePw(which) {
+    const body = { which: which };
+    if (which === 'cashier') body.new = document.getElementById('pwCash').value;
+    else { body.current = document.getElementById('pwMgrCur').value; body.new = document.getElementById('pwMgrNew').value; }
+    const r = await api('/api/manager/password', body);
+    if (!r.success) { toast(r.message || 'Không đổi được mật khẩu', false); return; }
+    ['pwCash', 'pwMgrCur', 'pwMgrNew'].forEach(i => document.getElementById(i).value = '');
+    toast(which === 'cashier' ? 'Đã đổi mật khẩu thu ngân' : 'Đã đổi mật khẩu quản lí', true);
+  }
+
+
+  // ============ 6. ĐẶT BÀN ============
+  const RES_STATUS = {
+    PENDING:   ['Chờ xác nhận', 'bg-amber-950 text-amber-300'],
+    CONFIRMED: ['Đã xác nhận',  'bg-sky-950 text-sky-300'],
+    ARRIVED:   ['Đã đến',       'bg-emerald-950 text-emerald-300'],
+    NO_SHOW:   ['Không đến',    'bg-rose-950 text-rose-300'],
+    CANCELLED: ['Đã huỷ',       'bg-slate-800 text-slate-400']
+  };
+  const RES_ACTION = {
+    CONFIRMED: ['Xác nhận', B_GREEN], ARRIVED: ['Khách đã đến', B_GREEN],
+    NO_SHOW: ['Không đến', B_AMBER], CANCELLED: ['Huỷ', B_RED]
+  };
+  let BK = null;
+  let bkR = { from: '', to: '', quick: 'today' };
+
+  function bkQuick(q) {
+    const f = new Date(), t = new Date();
+    if (q === 'tomorrow') { f.setDate(f.getDate() + 1); t.setDate(t.getDate() + 1); }
+    if (q === 'week') t.setDate(t.getDate() + 6);
+    if (q === 'all') t.setDate(t.getDate() + 60);
+    bkR = { from: iso(f), to: iso(t), quick: q };
+    loadBooking();
+  }
+  function bkCustom() {
+    const f = document.getElementById('bkFrom').value, t = document.getElementById('bkTo').value;
+    if (!f) return;
+    bkR = { from: f, to: t && t >= f ? t : f, quick: '' };
+    loadBooking();
+  }
+
+  async function loadBooking() {
+    if (!bkR.from) bkQuick('today');
+    if (!bkR.from) return;
+    document.getElementById('bkFrom').value = bkR.from;
+    document.getElementById('bkTo').value = bkR.to;
+    document.querySelectorAll('.bq').forEach(b => b.classList.toggle('active', b.dataset.q === bkR.quick));
+    const st = document.getElementById('bkStatus').value;
+    const r = await api('/api/manager/reservations?date_from=' + bkR.from + '&date_to=' + bkR.to +
+                        (st ? '&status=' + st : ''));
+    if (!r.reservations) { if (r.message) toast(r.message, false); return; }
+    BK = r;
+    renderBooking();
+  }
+
+  function renderBooking() {
+    const multi = bkR.from !== bkR.to;
+    document.getElementById('bkCounts').innerHTML = Object.keys(RES_STATUS).map(k =>
+      BK.counts[k] ? badge(RES_STATUS[k][0] + ': ' + BK.counts[k], RES_STATUS[k][1]) : '').join('') ||
+      '<span class="text-slate-500">Không có đơn đặt bàn.</span>';
+
+    document.getElementById('bkBody').innerHTML = BK.reservations.map(r => `
+      <tr class="border-t border-slate-800 ${r.status === 'CANCELLED' || r.status === 'NO_SHOW' ? 'opacity-60' : ''}">
+        <td class="px-4 py-3 whitespace-nowrap"><span class="font-black text-white text-base">${esc(r.time)}</span>
+          ${multi ? `<div class="text-[11px] text-slate-400">${esc(r.date.slice(8) + '/' + r.date.slice(5, 7))}</div>` : ''}</td>
+        <td class="px-4 py-3"><div class="font-bold text-white">${esc(r.customer_name)}</div>
+          <a href="tel:${esc(r.phone)}" class="text-xs text-sky-400">${esc(r.phone)}</a>
+          <span class="text-[10px] text-slate-500 ml-1">${r.source === 'WEB' ? 'web' : 'nhân viên'} · ${esc(r.created)}</span></td>
+        <td class="px-4 py-3 text-right font-bold">${r.guests}</td>
+        <td class="px-4 py-3 whitespace-nowrap">${esc(r.table_name)} <span class="text-xs text-slate-500">· tầng ${r.floor}</span></td>
+        <td class="px-4 py-3 text-slate-400 max-w-[14rem]">${esc(r.note || '')}</td>
+        <td class="px-4 py-3 text-center">${badge(RES_STATUS[r.status][0], RES_STATUS[r.status][1])}</td>
+        <td class="px-4 py-3"><div class="flex flex-wrap justify-end gap-1.5">
+          ${r.next.map(n => `<button data-id="${r.id}" data-s="${n}" onclick="resAct(this.dataset.id, this.dataset.s)"
+            class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${RES_ACTION[n][1]}">${RES_ACTION[n][0]}</button>`).join('')}
+        </div></td>
+      </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Không có đơn đặt bàn trong khoảng này.</td></tr>';
+  }
+
+  async function resAct(id, status) {
+    const r0 = BK.reservations.find(x => String(x.id) === String(id));
+    if ((status === 'CANCELLED' || status === 'NO_SHOW') &&
+        !confirm(RES_ACTION[status][0] + ' đơn của ' + r0.customer_name + ' (' + r0.time + ', bàn ' + r0.table_name + ')?')) return;
+    const r = await api('/api/manager/reservations/' + id + '/status', { status: status });
+    if (!r.success) { toast(r.message || 'Không cập nhật được', false); return; }
+    toast('Đã cập nhật: ' + RES_STATUS[status][0], true);
+    loadBooking();
+  }
+
+  function openRes() {
+    if (!BK) return;
+    ['rsName', 'rsPhone', 'rsNote'].forEach(i => document.getElementById(i).value = '');
+    document.getElementById('rsGuests').value = 2;
+    const today = iso(new Date());
+    const d = document.getElementById('rsDate');
+    d.min = today; d.value = bkR.from >= today ? bkR.from : today;
+    document.getElementById('rsTime').value = '18:00';
+    document.getElementById('rsTable').innerHTML = BK.tables.map(t =>
+      `<option value="${esc(t.id)}">${esc(t.name)} · tầng ${t.floor} · ${t.type === 'VIP' ? 'VIP ' + t.min_capacity + '–' + t.capacity : t.capacity} chỗ</option>`).join('');
+    formErr('rsErr');
+    showM('resModal');
+    document.getElementById('rsName').focus();
+  }
+
+  async function saveRes() {
+    const body = {
+      customer_name: document.getElementById('rsName').value, phone: document.getElementById('rsPhone').value,
+      guests: document.getElementById('rsGuests').value, date: document.getElementById('rsDate').value,
+      time: document.getElementById('rsTime').value, table_id: document.getElementById('rsTable').value,
+      note: document.getElementById('rsNote').value
+    };
+    const r = await api('/api/manager/reservations/new', body);
+    if (!r.success) { formErr('rsErr', r.message || 'Không lưu được'); return; }
+    hideM('resModal');
+    toast('Đã thêm đơn đặt bàn ' + r.reservation.table_name + ' lúc ' + r.reservation.time, true);
+    bkR = { from: body.date, to: body.date, quick: '' };
+    document.getElementById('bkStatus').value = '';
+    loadBooking();
+  }
+
+
+  // ============ 7. BÀN ============
+  let TBL = null, tblFloor = 'all', editTblId = null;
+
+  async function loadTables() {
+    const r = await api('/api/manager/tables');
+    if (!r.tables) return;
+    TBL = r.tables;
+    renderTables();
+  }
+  function setTblFloor(f) {
+    tblFloor = f;
+    document.querySelectorAll('.tf').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+    renderTables();
+  }
+  function renderTables() {
+    const list = TBL.filter(t => tblFloor === 'all' || String(t.floor) === tblFloor);
+    document.getElementById('tbBody').innerHTML = list.map(t => `
+      <tr class="border-t border-slate-800 ${t.is_active ? '' : 'opacity-50'}">
+        <td class="px-4 py-3 font-bold text-white">${esc(t.id)}</td>
+        <td class="px-4 py-3 text-slate-300">${esc(t.name)}</td>
+        <td class="px-4 py-3 text-center">${t.floor}</td>
+        <td class="px-4 py-3 text-center">${t.type === 'VIP' ? badge('VIP', 'bg-amber-950 text-amber-300') : '<span class="text-slate-400">Thường</span>'}</td>
+        <td class="px-4 py-3 text-right">${t.type === 'VIP' ? t.min_capacity + '–' + t.capacity : t.capacity}</td>
+        <td class="px-4 py-3 text-center">${t.upcoming ? badge(t.upcoming + ' đơn', 'bg-sky-950 text-sky-300') : '<span class="text-slate-600">–</span>'}</td>
+        <td class="px-4 py-3 text-center">${!t.is_active ? badge('Đã ẩn', 'bg-slate-800 text-slate-400')
+            : t.busy ? badge('Đang có khách', 'bg-rose-950 text-rose-300') : badge('Trống', 'bg-emerald-950 text-emerald-300')}</td>
+        <td class="px-4 py-3"><div class="flex flex-wrap justify-end gap-1.5">
+          ${btn('Sửa', B_GRAY, 'openTbl', t.id)}
+          ${btn(t.is_active ? 'Ẩn' : 'Hiện', t.is_active ? B_AMBER : B_GREEN, 'toggleTbl', t.id)}
+          ${t.orders === 0 && !t.busy ? btn('Xoá', B_RED, 'delTbl', t.id) : ''}
+        </div></td>
+      </tr>`).join('') || '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">Chưa có bàn.</td></tr>';
+  }
+
+  function openTbl(id) {
+    const t = id ? TBL.find(x => x.id === id) : null;
+    editTblId = t ? t.id : null;
+    document.getElementById('tbTitle').textContent = t ? 'Sửa bàn ' + t.id : 'Thêm bàn';
+    const idEl = document.getElementById('tbId');
+    idEl.value = t ? t.id : ''; idEl.disabled = !!t;
+    idEl.classList.toggle('opacity-50', !!t);
+    document.getElementById('tbName').value = t ? t.name : '';
+    document.getElementById('tbFloor').value = t ? t.floor : (tblFloor === '1' ? '1' : '2');
+    document.getElementById('tbType').value = t ? t.type : 'NORMAL';
+    document.getElementById('tbCap').value = t ? t.capacity : 4;
+    document.getElementById('tbMin').value = t ? t.min_capacity : 1;
+    formErr('tbErr');
+    showM('tblModal');
+    (t ? document.getElementById('tbName') : idEl).focus();
+  }
+  async function saveTbl() {
+    const body = {
+      name: document.getElementById('tbName').value, floor: document.getElementById('tbFloor').value,
+      type: document.getElementById('tbType').value, capacity: document.getElementById('tbCap').value,
+      min_capacity: document.getElementById('tbMin').value
+    };
+    let url = '/api/manager/table/new';
+    if (editTblId) url = '/api/manager/table/' + encodeURIComponent(editTblId);
+    else body.id = document.getElementById('tbId').value;
+    const r = await api(url, body);
+    if (!r.success) { formErr('tbErr', r.message || 'Không lưu được'); return; }
+    hideM('tblModal');
+    toast(editTblId ? 'Đã cập nhật bàn' : 'Đã thêm bàn ' + r.id, true);
+    loadTables();
+  }
+  async function toggleTbl(id) {
+    const t = TBL.find(x => x.id === id);
+    if (t.is_active && !confirm('Ẩn bàn ' + t.name + '? Bàn sẽ không hiện ở màn hình phục vụ và trang đặt bàn.')) return;
+    const r = await api('/api/manager/table/' + encodeURIComponent(id), { is_active: !t.is_active });
+    if (!r.success) { toast(r.message || 'Không đổi được', false); return; }
+    toast(t.is_active ? 'Đã ẩn bàn ' + t.name : 'Đã hiện bàn ' + t.name, true);
+    loadTables();
+  }
+  async function delTbl(id) {
+    const t = TBL.find(x => x.id === id);
+    if (!confirm('Xoá hẳn bàn ' + t.name + '?')) return;
+    const r = await api('/api/manager/table/' + encodeURIComponent(id) + '/delete', {});
+    if (!r.success) { toast(r.message || 'Không xoá được', false); return; }
+    toast('Đã xoá bàn ' + t.name, true);
+    loadTables();
+  }
+
+
+  // ============ 8. GÓI BUFFET ============
+  const DOW = [[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']];
+  let PK = null, editPkId = null, pkDays = new Set(), pkNameTouched = false;
+
+  async function loadPackages() {
+    const r = await api('/api/manager/packages');
+    if (!r.packages) return;
+    PK = r;
+    renderPackages();
+  }
+  function daysText(days) {
+    if (!days.length || days.length === 7) return 'Mọi ngày';
+    return days.map(d => DOW[d - 1][1]).join(', ');
+  }
+  function renderPackages() {
+    const one = p => `
+      <div class="bg-slate-900 border ${p.is_active ? 'border-slate-800' : 'border-slate-800 opacity-50'} rounded-2xl p-5">
+        <div class="flex items-start justify-between gap-2">
+          <p class="text-xs text-slate-400">${esc(p.name)}</p>
+          ${p.is_active ? '' : badge('Đã tắt', 'bg-slate-800 text-slate-400')}
+        </div>
+        <p class="text-3xl font-black text-red-500 mt-1">${money(p.price)}</p>
+        <p class="text-xs text-slate-400 mt-2"><i class="fa-regular fa-calendar mr-1"></i>${daysText(p.days)}</p>
+        <p class="text-xs text-slate-500 mt-1">${p.items} món trong gói${p.open_orders ? ' · ' + p.open_orders + ' bàn đang dùng' : ''}</p>
+        <div class="flex gap-2 mt-4">
+          ${btn('Sửa giá / ngày', B_GRAY, 'openPk', p.id)}
+          ${btn(p.is_active ? 'Tắt' : 'Bật', p.is_active ? B_AMBER : B_GREEN, 'togglePk', p.id)}
+        </div>
+      </div>`;
+    document.getElementById('pkFood').innerHTML = PK.packages.filter(p => p.kind === 'food').map(one).join('');
+    document.getElementById('pkDrink').innerHTML = PK.packages.filter(p => p.kind === 'drink').map(one).join('');
+  }
+
+  function openPk(id) {
+    const p = PK.packages.find(x => String(x.id) === String(id));
+    editPkId = p.id;
+    pkNameTouched = false;
+    pkDays = new Set(p.days);
+    document.getElementById('pkTitle').textContent = 'Sửa ' + p.name;
+    document.getElementById('pkPrice').value = p.price;
+    document.getElementById('pkName').value = p.name;
+    const w = document.getElementById('pkWarn');
+    const notes = [];
+    if (p.open_orders) notes.push('Đang có ' + p.open_orders + ' bàn dùng gói này: nếu đổi giá, các bàn đó sẽ tính theo giá mới khi thanh toán.');
+    if (/\(.*\)/.test(p.name)) notes.push('Tên gói đang ghi sẵn ngày áp dụng, nếu đổi ngày nhớ sửa lại tên cho khớp.');
+    w.innerHTML = notes.map(esc).join('<br>');
+    w.classList.toggle('hidden', !notes.length);
+    formErr('pkErr');
+    renderPkDays();
+    showM('pkgModal');
+  }
+  function renderPkDays() {
+    document.getElementById('pkDays').innerHTML = DOW.map(d => `
+      <button type="button" data-d="${d[0]}" onclick="togglePkDay(Number(this.dataset.d))"
+        class="chip ${pkDays.has(d[0]) ? 'active' : ''} px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-950 text-xs font-bold hover:border-red-500 transition">${d[1]}</button>`).join('');
+  }
+  function togglePkDay(d) {
+    if (pkDays.has(d)) pkDays.delete(d); else pkDays.add(d);
+    renderPkDays();
+  }
+  function onPkPrice() {
+    // tên dạng "Buffet 199K" thì tự đổi theo giá, trừ khi bạn đã tự sửa tên
+    if (pkNameTouched) return;
+    const p = PK.packages.find(x => x.id === editPkId);
+    const v = Number(document.getElementById('pkPrice').value);
+    if (/^Buffet \d+K$/i.test(p.name) && v >= 1000 && v % 1000 === 0)
+      document.getElementById('pkName').value = 'Buffet ' + (v / 1000) + 'K';
+  }
+  async function savePk() {
+    const r = await api('/api/manager/package/' + editPkId, {
+      price: document.getElementById('pkPrice').value, name: document.getElementById('pkName').value,
+      days: [...pkDays]
+    });
+    if (!r.success) { formErr('pkErr', r.message || 'Không lưu được'); return; }
+    hideM('pkgModal');
+    toast('Đã cập nhật gói buffet', true);
+    loadPackages();
+  }
+  async function togglePk(id) {
+    const p = PK.packages.find(x => String(x.id) === String(id));
+    if (p.is_active && !confirm('Tắt ' + p.name + '? Phục vụ sẽ không chọn được gói này khi mở bàn.')) return;
+    const r = await api('/api/manager/package/' + id, { is_active: !p.is_active });
+    if (!r.success) { toast(r.message || 'Không đổi được', false); return; }
+    toast(p.is_active ? 'Đã tắt ' + p.name : 'Đã bật ' + p.name, true);
+    loadPackages();
   }
 
 

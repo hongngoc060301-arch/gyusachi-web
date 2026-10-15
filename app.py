@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from db import query, transaction
 
@@ -56,7 +57,7 @@ def fail(message, status=400):
 
 def get_staffs():
     # KHÔNG lấy cột pin để không gửi PIN ra trình duyệt
-    rows = query("SELECT id, name, role, avatar FROM staffs ORDER BY id")
+    rows = query("SELECT id, name, role, avatar FROM staffs WHERE is_active ORDER BY id")
     return [dict(r) for r in rows]
 
 
@@ -68,10 +69,10 @@ def get_stations():
 
 def get_tables(floor=None):
     sql = ("SELECT id, name, capacity, min_capacity, floor, type, status "
-           "FROM dining_tables")
+           "FROM dining_tables WHERE is_active")
     params = None
     if floor is not None:
-        sql += " WHERE floor = %s"
+        sql += " AND floor = %s"
         params = (floor,)
     # Xếp bàn thường theo số (B1..B11), phòng VIP đứng sau cùng
     sql += (" ORDER BY floor, (type = 'VIP'), "
@@ -154,7 +155,7 @@ def verify_pin():
 
     try:
         staff = query(
-            "SELECT id, name FROM staffs WHERE id = %s AND pin = %s",
+            "SELECT id, name FROM staffs WHERE id = %s AND pin = %s AND is_active",
             (code, entered_pin), one=True
         )
         station = query(
@@ -282,6 +283,7 @@ def api_tables():
                o.id AS order_id, o.guests
         FROM dining_tables t
         LEFT JOIN orders o ON o.table_id = t.id AND o.status = 'OPEN'
+        WHERE t.is_active
         ORDER BY t.floor, (t.type = 'VIP'),
                  NULLIF(regexp_replace(t.id, '\\D', '', 'g'), '')::int, t.id
     """)
@@ -294,7 +296,7 @@ def api_packages():
     today = datetime.now().isoweekday()          # 1 = thứ 2 ... 7 = chủ nhật
     food, drink = [], []
 
-    for r in query("SELECT id, name, price, valid_days FROM packages ORDER BY price"):
+    for r in query("SELECT id, name, price, valid_days FROM packages WHERE is_active ORDER BY price"):
         days = [int(x) for x in (r['valid_days'] or '').split(',') if x.strip()]
         item = {
             "id": r['id'], "name": r['name'], "price": r['price'],
@@ -403,7 +405,7 @@ def api_open_order():
 
     try:
         with transaction() as cur:
-            cur.execute("SELECT id FROM dining_tables WHERE id = %s FOR UPDATE", (table_id,))
+            cur.execute("SELECT id FROM dining_tables WHERE id = %s AND is_active FOR UPDATE", (table_id,))
             if not cur.fetchone():
                 raise OrderError("Không tìm thấy bàn.")
 
@@ -411,18 +413,18 @@ def api_open_order():
             if cur.fetchone():
                 raise OrderError("Bàn này đang có khách, hãy tải lại trang.")
 
-            cur.execute("SELECT id FROM staffs WHERE id = %s", (staff_id,))
+            cur.execute("SELECT id FROM staffs WHERE id = %s AND is_active", (staff_id,))
             if not cur.fetchone():
                 raise OrderError("Không tìm thấy nhân viên.")
 
             if package_id:
-                cur.execute("SELECT price FROM packages WHERE id = %s", (package_id,))
+                cur.execute("SELECT price FROM packages WHERE id = %s AND is_active", (package_id,))
                 p = cur.fetchone()
                 if not p or p['price'] < FOOD_PACKAGE_MIN_PRICE:
                     raise OrderError("Gói buffet đồ ăn không hợp lệ.")
 
             if drink_id:
-                cur.execute("SELECT price FROM packages WHERE id = %s", (drink_id,))
+                cur.execute("SELECT price FROM packages WHERE id = %s AND is_active", (drink_id,))
                 p = cur.fetchone()
                 if not p or p['price'] >= FOOD_PACKAGE_MIN_PRICE:
                     raise OrderError("Gói buffet nước không hợp lệ.")
@@ -462,13 +464,13 @@ def api_change_package(order_id):
                 raise OrderError("Bạn chưa chọn vé khác với vé hiện tại.")
 
             if package_id:
-                cur.execute("SELECT price FROM packages WHERE id = %s", (package_id,))
+                cur.execute("SELECT price FROM packages WHERE id = %s AND is_active", (package_id,))
                 p = cur.fetchone()
                 if not p or p['price'] < FOOD_PACKAGE_MIN_PRICE:
                     raise OrderError("Gói buffet đồ ăn không hợp lệ.")
 
             if drink_id:
-                cur.execute("SELECT price, valid_days FROM packages WHERE id = %s", (drink_id,))
+                cur.execute("SELECT price, valid_days FROM packages WHERE id = %s AND is_active", (drink_id,))
                 p = cur.fetchone()
                 if not p or p['price'] >= FOOD_PACKAGE_MIN_PRICE:
                     raise OrderError("Gói buffet nước không hợp lệ.")
@@ -804,7 +806,7 @@ def thungan():
 @app.route('/api/cashier/login', methods=['POST'])
 def api_cashier_login():
     pw = str((request.get_json() or {}).get('password', '')).strip()
-    if pw != CASHIER_PASSWORD:
+    if not check_pw('cashier', pw):
         return fail("Mật khẩu không đúng.", 401)
     session['cashier'] = True
     return jsonify({"success": True})
@@ -937,7 +939,7 @@ def quanli():
 @app.route('/api/manager/login', methods=['POST'])
 def api_manager_login():
     pw = str((request.get_json() or {}).get('password', '')).strip()
-    if pw != MANAGER_PASSWORD:
+    if not check_pw('manager', pw):
         return fail("Mật khẩu không đúng.", 401)
     session['manager'] = True
     return jsonify({"success": True})
@@ -1012,7 +1014,7 @@ def api_manager_overview():
 
     open_row = query("""SELECT COUNT(*)::int AS tables, COALESCE(SUM(guests), 0)::int AS guests
                         FROM orders WHERE status = 'OPEN'""", one=True)
-    all_tables = query("SELECT COUNT(*)::int AS n FROM dining_tables", one=True)['n']
+    all_tables = query("SELECT COUNT(*)::int AS n FROM dining_tables WHERE is_active", one=True)['n']
 
     today = datetime.now().date()
     series = daily_series((today - timedelta(days=13)).isoformat(), today.isoformat())
@@ -1093,7 +1095,13 @@ def api_manager_invoice(order_id):
         FROM order_items
         WHERE order_id = %s AND parent_id IS NULL AND kind IN ('ALACARTE', 'COMBO') AND status <> 'CANCELLED'
         ORDER BY id""", (order_id,))
-    return jsonify({"success": True, "invoice": dict(o), "lines": [dict(l) for l in lines]})
+    inv = dict(o)
+    # Đã thanh toán: đơn giá lấy theo số tiền đã lưu (không đổi dù sau này quản lí sửa giá gói)
+    if inv.get('guests') and inv.get('food_amount') is not None:
+        inv['package_price'] = inv['food_amount'] // inv['guests']
+    if inv.get('guests') and inv.get('drink_amount') is not None:
+        inv['drink_price'] = inv['drink_amount'] // inv['guests']
+    return jsonify({"success": True, "invoice": inv, "lines": [dict(l) for l in lines]})
 
 
 # ---------- 3. THỐNG KÊ MÓN ----------
@@ -1277,6 +1285,518 @@ def api_manager_menu_item(item_id):
 
 
 # =========================================================
+# 8D. QUẢN LÍ NÂNG CAO: mật khẩu, nhân viên, đặt bàn, bàn, gói buffet
+# =========================================================
+
+DEFAULT_PASSWORDS = {'cashier': CASHIER_PASSWORD, 'manager': MANAGER_PASSWORD}
+
+
+def check_pw(key, pw):
+    """Kiểm tra mật khẩu 'cashier' / 'manager'. Đã đổi mật khẩu (bảng app_settings) thì dùng mật khẩu mới,
+    chưa đổi thì dùng mật khẩu mặc định trong code."""
+    try:
+        row = query("SELECT value FROM app_settings WHERE key = %s", (key,), one=True)
+    except Exception:
+        row = None            # chưa chạy file 17 -> vẫn dùng mật khẩu mặc định
+    if row:
+        return check_password_hash(row['value'], pw)
+    return pw == DEFAULT_PASSWORDS[key]
+
+
+@app.route('/api/manager/password', methods=['POST'])
+def api_manager_password():
+    """Đổi mật khẩu thu ngân (chỉ cần đang đăng nhập quản lí) hoặc mật khẩu quản lí (phải nhập mật khẩu hiện tại)."""
+    data = request.get_json() or {}
+    which = data.get('which')
+    new = str(data.get('new') or '').strip()
+    if which not in ('cashier', 'manager'):
+        return fail("Chọn mật khẩu cần đổi.")
+    if which == 'manager' and not check_pw('manager', str(data.get('current') or '').strip()):
+        return fail("Mật khẩu quản lí hiện tại không đúng.")
+    min_len = 6 if which == 'manager' else 4
+    if len(new) < min_len or len(new) > 30:
+        return fail(f"Mật khẩu mới phải từ {min_len} đến 30 ký tự.")
+    if which == 'cashier' and check_pw('manager', new):
+        return fail("Mật khẩu thu ngân không nên trùng mật khẩu quản lí.")
+    with transaction() as cur:
+        cur.execute("""INSERT INTO app_settings (key, value) VALUES (%s, %s)
+                       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()""",
+                    (which, generate_password_hash(new)))
+    return jsonify({"success": True})
+
+
+# ---------- Nhân viên ----------
+
+def check_pin(pin):
+    pin = str(pin or '').strip()
+    if not re.fullmatch(r'\d{4}', pin):
+        raise OrderError("Mã PIN phải gồm đúng 4 chữ số.")
+    return pin
+
+
+def pin_taken(cur, pin, except_staff=None, except_station=None):
+    cur.execute("SELECT id FROM staffs WHERE pin = %s AND id <> %s", (pin, except_staff or ''))
+    if cur.fetchone():
+        return True
+    cur.execute("SELECT id FROM stations WHERE pin = %s AND id <> %s", (pin, except_station or ''))
+    return bool(cur.fetchone())
+
+
+@app.route('/api/manager/staff')
+def api_manager_staff():
+    staffs = query("""
+        SELECT s.id, s.name, s.role, s.avatar, s.is_active,
+               (SELECT COUNT(*) FROM orders o WHERE o.staff_id = s.id)::int AS orders,
+               EXISTS (SELECT 1 FROM orders o WHERE o.staff_id = s.id AND o.status = 'OPEN') AS busy
+        FROM staffs s ORDER BY s.id""")
+    stations = query("SELECT id, name, description FROM stations ORDER BY id")
+    return jsonify({"staffs": [dict(r) for r in staffs], "stations": [dict(r) for r in stations]})
+
+
+@app.route('/api/manager/staff/new', methods=['POST'])
+def api_manager_staff_new():
+    data = request.get_json() or {}
+    try:
+        name = clean_name(data.get('name'), 100)
+        role = clean_name(data.get('role'), 50)
+        pin = check_pin(data.get('pin'))
+        avatar = str(data.get('avatar') or '').strip()[:200] or None
+        with transaction() as cur:
+            if pin_taken(cur, pin):
+                raise OrderError("Mã PIN này đã có người dùng, hãy chọn PIN khác.")
+            cur.execute("SELECT COALESCE(MAX(id::int), 0) + 1 AS n FROM staffs WHERE id ~ '^[0-9]+$'")
+            new_id = '%02d' % cur.fetchone()['n']
+            cur.execute("INSERT INTO staffs (id, name, role, pin, avatar) VALUES (%s, %s, %s, %s, %s)",
+                        (new_id, name, role, pin, avatar))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "id": new_id})
+
+
+@app.route('/api/manager/staff/<staff_id>', methods=['POST'])
+def api_manager_staff_edit(staff_id):
+    data = request.get_json() or {}
+    try:
+        with transaction() as cur:
+            cur.execute("SELECT id FROM staffs WHERE id = %s FOR UPDATE", (staff_id,))
+            if not cur.fetchone():
+                raise OrderError("Không tìm thấy nhân viên.", )
+            sets, params = [], []
+            if 'name' in data:
+                sets.append("name = %s"); params.append(clean_name(data['name'], 100))
+            if 'role' in data:
+                sets.append("role = %s"); params.append(clean_name(data['role'], 50))
+            if 'avatar' in data:
+                sets.append("avatar = %s"); params.append(str(data['avatar'] or '').strip()[:200] or None)
+            if 'pin' in data:
+                pin = check_pin(data['pin'])
+                if pin_taken(cur, pin, except_staff=staff_id):
+                    raise OrderError("Mã PIN này đã có người dùng, hãy chọn PIN khác.")
+                sets.append("pin = %s"); params.append(pin)
+            if 'is_active' in data:
+                active = bool(data['is_active'])
+                if not active:
+                    cur.execute("SELECT 1 FROM orders WHERE staff_id = %s AND status = 'OPEN'", (staff_id,))
+                    if cur.fetchone():
+                        raise OrderError("Nhân viên này đang phụ trách bàn chưa thanh toán, chưa khoá được.")
+                sets.append("is_active = %s"); params.append(active)
+            if not sets:
+                raise OrderError("Không có gì để cập nhật.")
+            cur.execute(f"UPDATE staffs SET {', '.join(sets)} WHERE id = %s", (*params, staff_id))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True})
+
+
+@app.route('/api/manager/staff/<staff_id>/delete', methods=['POST'])
+def api_manager_staff_delete(staff_id):
+    with transaction() as cur:
+        cur.execute("SELECT id FROM staffs WHERE id = %s FOR UPDATE", (staff_id,))
+        if not cur.fetchone():
+            return fail("Không tìm thấy nhân viên.", 404)
+        cur.execute("SELECT 1 FROM orders WHERE staff_id = %s OR cashier_id = %s LIMIT 1", (staff_id, staff_id))
+        if cur.fetchone():
+            return fail("Nhân viên này đã có lịch sử phục vụ nên không xoá được. Hãy bấm KHOÁ để họ không đăng nhập nữa.")
+        cur.execute("DELETE FROM staffs WHERE id = %s", (staff_id,))
+    return jsonify({"success": True})
+
+
+@app.route('/api/manager/station/<station_id>/pin', methods=['POST'])
+def api_manager_station_pin(station_id):
+    try:
+        pin = check_pin((request.get_json() or {}).get('pin'))
+        with transaction() as cur:
+            cur.execute("SELECT id FROM stations WHERE id = %s FOR UPDATE", (station_id,))
+            if not cur.fetchone():
+                raise OrderError("Không tìm thấy trạm bếp.")
+            if pin_taken(cur, pin, except_station=station_id):
+                raise OrderError("Mã PIN này đã có người dùng, hãy chọn PIN khác.")
+            cur.execute("UPDATE stations SET pin = %s WHERE id = %s", (pin, station_id))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True})
+
+
+# ---------- Đặt bàn ----------
+
+RESERVE_FIRST = '10:00'        # giờ đặt sớm nhất
+RESERVE_LAST = '21:30'         # giờ đặt muộn nhất
+RESERVE_GAP_MIN = 120          # 2 đơn cùng bàn cách nhau tối thiểu 120 phút (bằng thời gian ăn buffet)
+RESERVE_MAX_DAYS = 60          # chỉ cho đặt trước tối đa 60 ngày
+RESERVE_ACTIVE = ('PENDING', 'CONFIRMED', 'ARRIVED')
+RESERVE_FLOW = {               # trạng thái hiện tại -> các trạng thái được chuyển tới
+    'PENDING':   ('CONFIRMED', 'CANCELLED'),
+    'CONFIRMED': ('ARRIVED', 'NO_SHOW', 'CANCELLED'),
+    'ARRIVED':   (),
+    'NO_SHOW':   (),
+    'CANCELLED': (),
+}
+
+
+def create_reservation(data, source):
+    """Kiểm tra + lưu 1 đơn đặt bàn. Dùng chung cho khách tự đặt (WEB) và nhân viên nhập (STAFF).
+    Raise OrderError nếu dữ liệu sai."""
+    name = clean_name(data.get('customer_name'), 100)
+    phone = re.sub(r'[\s.\-]', '', str(data.get('phone') or ''))
+    if not re.fullmatch(r'(0\d{9,10}|\+84\d{9,10})', phone):
+        raise OrderError("Số điện thoại không hợp lệ.")
+
+    try:
+        guests = int(data.get('guests'))
+    except (TypeError, ValueError):
+        raise OrderError("Số khách không hợp lệ.")
+    if not 1 <= guests <= 60:
+        raise OrderError("Số khách phải từ 1 đến 60.")
+
+    try:
+        day = datetime.strptime(str(data.get('date') or ''), '%Y-%m-%d').date()
+        hhmm = datetime.strptime(str(data.get('time') or ''), '%H:%M').strftime('%H:%M')
+    except ValueError:
+        raise OrderError("Hãy chọn ngày và giờ đặt bàn.")
+    now = datetime.now()
+    if day < now.date():
+        raise OrderError("Ngày đặt bàn không được ở quá khứ.")
+    if day > now.date() + timedelta(days=RESERVE_MAX_DAYS):
+        raise OrderError(f"Chỉ nhận đặt trước tối đa {RESERVE_MAX_DAYS} ngày.")
+    if not RESERVE_FIRST <= hhmm <= RESERVE_LAST:
+        raise OrderError(f"Nhà hàng nhận đặt bàn từ {RESERVE_FIRST} đến {RESERVE_LAST}.")
+    if day == now.date() and hhmm <= now.strftime('%H:%M'):
+        raise OrderError("Giờ đặt bàn đã qua, hãy chọn giờ khác.")
+
+    note = str(data.get('note') or '').strip()[:300] or None
+    table_id = str(data.get('table_id') or '').strip()
+
+    with transaction() as cur:
+        cur.execute("""SELECT id, name, capacity, min_capacity, type FROM dining_tables
+                       WHERE id = %s AND is_active FOR UPDATE""", (table_id,))
+        t = cur.fetchone()
+        if not t:
+            raise OrderError("Không tìm thấy bàn này.")
+        if t['type'] == 'VIP':
+            if not t['min_capacity'] <= guests <= t['capacity']:
+                raise OrderError(f"Phòng VIP nhận từ {t['min_capacity']} đến {t['capacity']} khách.")
+        elif guests > t['capacity']:
+            raise OrderError(f"Bàn {t['name']} chỉ có {t['capacity']} chỗ.")
+
+        cur.execute("""
+            SELECT to_char(reserve_time, 'HH24:MI') AS clash_time FROM reservations
+            WHERE table_id = %s AND reserve_date = %s AND status = ANY(%s)
+              AND ABS(EXTRACT(EPOCH FROM (reserve_time - %s::time))) / 60 < %s
+            LIMIT 1""", (table_id, day, list(RESERVE_ACTIVE), hhmm, RESERVE_GAP_MIN))
+        clash = cur.fetchone()
+        if clash:
+            raise OrderError(f"Bàn {t['name']} đã có người đặt lúc {clash['clash_time']}. Hãy chọn bàn hoặc giờ khác.")
+
+        if source == 'WEB':
+            cur.execute("""SELECT COUNT(*)::int AS n FROM reservations
+                           WHERE phone = %s AND reserve_date >= CURRENT_DATE
+                             AND status IN ('PENDING', 'CONFIRMED')""", (phone,))
+            if cur.fetchone()['n'] >= 3:
+                raise OrderError("Số điện thoại này đã có 3 đơn đặt bàn sắp tới. Vui lòng liên hệ nhà hàng.")
+
+        cur.execute("""INSERT INTO reservations
+                         (customer_name, phone, guests, table_id, reserve_date, reserve_time, note, status, source)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                    (name, phone, guests, table_id, day, hhmm, note,
+                     'CONFIRMED' if source == 'STAFF' else 'PENDING', source))
+        rid = cur.fetchone()['id']
+    return {"id": rid, "table_id": table_id, "table_name": t['name'], "date": str(day), "time": hhmm}
+
+
+@app.route('/api/book-table', methods=['POST'])
+def api_book_table():
+    """Khách tự đặt bàn trên website (không cần đăng nhập)."""
+    try:
+        r = create_reservation(request.get_json() or {}, 'WEB')
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "reservation": r})
+
+
+@app.route('/api/manager/reservations')
+def api_manager_reservations():
+    """Danh sách đặt bàn. Tham số: date_from, date_to (YYYY-MM-DD), status (tuỳ chọn)."""
+    d_from = request.args.get('date_from') or str(datetime.now().date())
+    d_to = request.args.get('date_to') or d_from
+    status = request.args.get('status') or None
+    try:
+        datetime.strptime(d_from, '%Y-%m-%d'); datetime.strptime(d_to, '%Y-%m-%d')
+    except ValueError:
+        return fail("Ngày không hợp lệ.")
+    rows = query("""
+        SELECT r.id, r.customer_name, r.phone, r.guests, r.table_id, t.name AS table_name, t.floor,
+               to_char(r.reserve_date, 'YYYY-MM-DD') AS date, to_char(r.reserve_time, 'HH24:MI') AS time,
+               r.note, r.status, r.source, to_char(r.created_at, 'DD/MM HH24:MI') AS created
+        FROM reservations r JOIN dining_tables t ON t.id = r.table_id
+        WHERE r.reserve_date BETWEEN %s AND %s AND (%s::text IS NULL OR r.status = %s)
+        ORDER BY r.reserve_date, r.reserve_time, r.id""", (d_from, d_to, status, status))
+    out = [dict(r) for r in rows]
+    for r in out:
+        r['next'] = list(RESERVE_FLOW.get(r['status'], ()))
+    counts = {}
+    for r in out:
+        counts[r['status']] = counts.get(r['status'], 0) + 1
+    return jsonify({"reservations": out, "counts": counts,
+                    "tables": [dict(t) for t in query(
+                        "SELECT id, name, floor, capacity, min_capacity, type FROM dining_tables "
+                        "WHERE is_active ORDER BY floor, (type = 'VIP'), "
+                        "NULLIF(regexp_replace(id, '\\D', '', 'g'), '')::int, id")]})
+
+
+@app.route('/api/manager/reservations/new', methods=['POST'])
+def api_manager_reservation_new():
+    """Nhân viên nhập đơn đặt bàn (khách gọi điện) - tự xác nhận."""
+    try:
+        r = create_reservation(request.get_json() or {}, 'STAFF')
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "reservation": r})
+
+
+@app.route('/api/manager/reservations/<int:rid>/status', methods=['POST'])
+def api_manager_reservation_status(rid):
+    new = (request.get_json() or {}).get('status')
+    with transaction() as cur:
+        cur.execute("SELECT status FROM reservations WHERE id = %s FOR UPDATE", (rid,))
+        r = cur.fetchone()
+        if not r:
+            return fail("Không tìm thấy đơn đặt bàn.", 404)
+        if new not in RESERVE_FLOW.get(r['status'], ()):
+            return fail("Không chuyển được sang trạng thái này.")
+        cur.execute("UPDATE reservations SET status = %s, updated_at = NOW() WHERE id = %s", (new, rid))
+    return jsonify({"success": True})
+
+
+# ---------- Bàn ----------
+
+TABLE_FLOORS = (1, 2)
+NATURAL_TABLE_ORDER = ("t.floor, (t.type = 'VIP'), "
+                       "NULLIF(regexp_replace(t.id, '\\D', '', 'g'), '')::int, t.id")
+
+
+def table_fields(data, partial=False):
+    """Đọc + kiểm tra thông tin bàn. partial=True: chỉ kiểm tra các trường có gửi lên."""
+    out = {}
+    if 'name' in data or not partial:
+        out['name'] = clean_name(data.get('name'), 50)
+    if 'capacity' in data or not partial:
+        try:
+            out['capacity'] = int(data.get('capacity'))
+        except (TypeError, ValueError):
+            raise OrderError("Số chỗ không hợp lệ.")
+        if not 1 <= out['capacity'] <= 30:
+            raise OrderError("Số chỗ phải từ 1 đến 30.")
+    if 'min_capacity' in data or not partial:
+        try:
+            out['min_capacity'] = int(data.get('min_capacity') or 1)
+        except (TypeError, ValueError):
+            raise OrderError("Số khách tối thiểu không hợp lệ.")
+        if out['min_capacity'] < 1:
+            raise OrderError("Số khách tối thiểu phải từ 1.")
+    if 'floor' in data or not partial:
+        try:
+            out['floor'] = int(data.get('floor'))
+        except (TypeError, ValueError):
+            raise OrderError("Tầng không hợp lệ.")
+        if out['floor'] not in TABLE_FLOORS:
+            raise OrderError("Nhà hàng có tầng 1 và tầng 2.")
+    if 'type' in data or not partial:
+        out['type'] = str(data.get('type') or 'NORMAL').upper()
+        if out['type'] not in ('NORMAL', 'VIP'):
+            raise OrderError("Loại bàn không hợp lệ.")
+    return out
+
+
+@app.route('/api/manager/tables')
+def api_manager_tables():
+    rows = query(f"""
+        SELECT t.id, t.name, t.capacity, t.min_capacity, t.floor, t.type, t.is_active,
+               EXISTS (SELECT 1 FROM orders o WHERE o.table_id = t.id AND o.status = 'OPEN') AS busy,
+               (SELECT COUNT(*) FROM orders o WHERE o.table_id = t.id)::int AS orders,
+               (SELECT COUNT(*) FROM reservations r WHERE r.table_id = t.id
+                  AND r.reserve_date >= CURRENT_DATE AND r.status IN ('PENDING', 'CONFIRMED'))::int AS upcoming
+        FROM dining_tables t ORDER BY {NATURAL_TABLE_ORDER}""")
+    return jsonify({"tables": [dict(r) for r in rows]})
+
+
+@app.route('/api/manager/table/new', methods=['POST'])
+def api_manager_table_new():
+    data = request.get_json() or {}
+    try:
+        tid = re.sub(r'\s', '', str(data.get('id') or '')).upper()
+        if not re.fullmatch(r'[A-Z0-9]{1,10}', tid):
+            raise OrderError("Mã bàn chỉ gồm chữ và số, tối đa 10 ký tự (VD: B12).")
+        f = table_fields({**data, 'name': data.get('name') or tid})
+        if f['min_capacity'] > f['capacity']:
+            raise OrderError("Số khách tối thiểu không được lớn hơn số chỗ.")
+        with transaction() as cur:
+            cur.execute("SELECT 1 FROM dining_tables WHERE id = %s", (tid,))
+            if cur.fetchone():
+                raise OrderError("Mã bàn này đã tồn tại.")
+            cur.execute("""INSERT INTO dining_tables (id, name, capacity, min_capacity, floor, type)
+                           VALUES (%s, %s, %s, %s, %s, %s)""",
+                        (tid, f['name'], f['capacity'], f['min_capacity'], f['floor'], f['type']))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "id": tid})
+
+
+@app.route('/api/manager/table/<table_id>', methods=['POST'])
+def api_manager_table_edit(table_id):
+    data = request.get_json() or {}
+    try:
+        f = table_fields(data, partial=True)
+        with transaction() as cur:
+            cur.execute("SELECT * FROM dining_tables WHERE id = %s FOR UPDATE", (table_id,))
+            t = cur.fetchone()
+            if not t:
+                raise OrderError("Không tìm thấy bàn.")
+            cap = f.get('capacity', t['capacity'])
+            mn = f.get('min_capacity', t['min_capacity'])
+            if mn > cap:
+                raise OrderError("Số khách tối thiểu không được lớn hơn số chỗ.")
+
+            cur.execute("SELECT 1 FROM orders WHERE table_id = %s AND status = 'OPEN'", (table_id,))
+            busy = bool(cur.fetchone())
+            if busy and ('floor' in f and f['floor'] != t['floor']):
+                raise OrderError("Bàn đang có khách, chưa đổi tầng được.")
+
+            sets, params = [], []
+            for k, v in f.items():
+                sets.append(f"{k} = %s"); params.append(v)
+            if 'is_active' in data:
+                active = bool(data['is_active'])
+                if not active:
+                    if busy:
+                        raise OrderError("Bàn đang có khách, chưa ẩn được.")
+                    cur.execute("""SELECT COUNT(*)::int AS n FROM reservations WHERE table_id = %s
+                                   AND reserve_date >= CURRENT_DATE AND status IN ('PENDING', 'CONFIRMED')""",
+                                (table_id,))
+                    n = cur.fetchone()['n']
+                    if n:
+                        raise OrderError(f"Bàn đang có {n} đơn đặt sắp tới, hãy xử lí các đơn đó trước.")
+                sets.append("is_active = %s"); params.append(active)
+            if not sets:
+                raise OrderError("Không có gì để cập nhật.")
+            cur.execute(f"UPDATE dining_tables SET {', '.join(sets)} WHERE id = %s", (*params, table_id))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True})
+
+
+@app.route('/api/manager/table/<table_id>/delete', methods=['POST'])
+def api_manager_table_delete(table_id):
+    with transaction() as cur:
+        cur.execute("SELECT id FROM dining_tables WHERE id = %s FOR UPDATE", (table_id,))
+        if not cur.fetchone():
+            return fail("Không tìm thấy bàn.", 404)
+        cur.execute("""SELECT (SELECT COUNT(*) FROM orders WHERE table_id = %s)
+                        + (SELECT COUNT(*) FROM reservations WHERE table_id = %s) AS n""", (table_id, table_id))
+        if cur.fetchone()['n']:
+            return fail("Bàn này đã có lịch sử hoá đơn hoặc đặt bàn nên không xoá được. Hãy bấm ẨN.")
+        cur.execute("DELETE FROM dining_tables WHERE id = %s", (table_id,))
+    return jsonify({"success": True})
+
+
+# ---------- Gói buffet ----------
+
+@app.route('/api/manager/packages')
+def api_manager_packages():
+    rows = query("""
+        SELECT p.id, p.name, p.price, p.valid_days, p.is_active,
+               (SELECT COUNT(*) FROM package_items pi WHERE pi.package_id = p.id)::int AS items,
+               (SELECT COUNT(*) FROM orders o WHERE o.status = 'OPEN'
+                  AND (o.package_id = p.id OR o.drink_package_id = p.id))::int AS open_orders
+        FROM packages p ORDER BY p.price""")
+    out = []
+    for r in rows:
+        r = dict(r)
+        r['days'] = [int(x) for x in (r.pop('valid_days') or '').split(',') if x.strip()]
+        r['kind'] = 'food' if r['price'] >= FOOD_PACKAGE_MIN_PRICE else 'drink'
+        out.append(r)
+    return jsonify({"packages": out, "food_min": FOOD_PACKAGE_MIN_PRICE})
+
+
+@app.route('/api/manager/package/<int:pid>', methods=['POST'])
+def api_manager_package(pid):
+    data = request.get_json() or {}
+    try:
+        with transaction() as cur:
+            cur.execute("SELECT * FROM packages WHERE id = %s FOR UPDATE", (pid,))
+            p = cur.fetchone()
+            if not p:
+                raise OrderError("Không tìm thấy gói.")
+            sets, params = [], []
+
+            if 'name' in data:
+                sets.append("name = %s"); params.append(clean_name(data['name'], 100))
+
+            if 'price' in data:
+                try:
+                    price = int(data['price'])
+                except (TypeError, ValueError):
+                    raise OrderError("Giá không hợp lệ.")
+                if not 1000 <= price <= 5_000_000:
+                    raise OrderError("Giá gói phải từ 1.000đ đến 5.000.000đ.")
+                if (price >= FOOD_PACKAGE_MIN_PRICE) != (p['price'] >= FOOD_PACKAGE_MIN_PRICE):
+                    raise OrderError("Gói đồ ăn phải từ %s trở lên, gói nước phải dưới mức đó."
+                                     % f"{FOOD_PACKAGE_MIN_PRICE:,}đ".replace(',', '.'))
+                cur.execute("SELECT 1 FROM packages WHERE price = %s AND id <> %s", (price, pid))
+                if cur.fetchone():
+                    raise OrderError("Đã có gói khác cùng mức giá này.")
+                sets.append("price = %s"); params.append(price)
+
+            if 'days' in data:
+                raw = data['days'] or []
+                try:
+                    days = sorted({int(x) for x in raw})
+                except (TypeError, ValueError):
+                    raise OrderError("Ngày áp dụng không hợp lệ.")
+                if any(d < 1 or d > 7 for d in days):
+                    raise OrderError("Ngày áp dụng không hợp lệ.")
+                # không chọn ngày nào hoặc chọn cả 7 ngày = áp dụng mọi ngày
+                sets.append("valid_days = %s")
+                params.append(None if not days or len(days) == 7 else ','.join(map(str, days)))
+
+            if 'is_active' in data:
+                active = bool(data['is_active'])
+                if not active:
+                    cur.execute("""SELECT COUNT(*)::int AS n FROM orders WHERE status = 'OPEN'
+                                   AND (package_id = %s OR drink_package_id = %s)""", (pid, pid))
+                    n = cur.fetchone()['n']
+                    if n:
+                        raise OrderError(f"Đang có {n} bàn dùng gói này, chưa tắt được.")
+                sets.append("is_active = %s"); params.append(active)
+
+            if not sets:
+                raise OrderError("Không có gì để cập nhật.")
+            cur.execute(f"UPDATE packages SET {', '.join(sets)} WHERE id = %s", (*params, pid))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True})
+
+
+# =========================================================
 # 9. KIỂM TRA KẾT NỐI DATABASE
 # =========================================================
 
@@ -1296,6 +1816,3 @@ def test_db():
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
-
-import os
-app.secret_key = os.environ.get('SECRET_KEY', 'gyusachi-do-an-chuyen-nganh')

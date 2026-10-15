@@ -1,4 +1,3 @@
-
 <style>
     .booking-section {
     padding: 60px 20px;
@@ -379,6 +378,32 @@
    THÔNG TIN BÀN CHỌN
    ========================= */
 
+.bk-field {
+    width: 100%;
+    margin-top: 4px;
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 15px;
+    outline: none;
+}
+
+.bk-field:focus {
+    border-color: #dc2626;
+}
+
+.bk-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    text-align: left;
+}
+
 .selected-table {
     margin: 25px auto;
 
@@ -507,7 +532,8 @@
               NHÀ VỆ SINH
             </div>
 
-            {% for t in tables if t.floor == 1 %}
+            {# Chỉ vẽ các bàn đã có vị trí trên sơ đồ (bàn thêm sau như B10, B11 không hiện ở đây) #}
+            {% for t in tables if t.floor == 1 and t.id in ['A1','A2','A3','A4','A5','A6','A7'] %}
             <div
               class="table table-{{ t.id }} {% if t.status != 'AVAILABLE' %}booked{% endif %}"
               data-id="{{ t.id }}"
@@ -551,7 +577,7 @@
               NHÀ VỆ SINH
             </div>
 
-            {% for t in tables if t.floor == 2 %}
+            {% for t in tables if t.floor == 2 and t.id in ['B1','B2','B3','B4','B5','B6','B7','B8','B9','V1','V2'] %}
             <div
               class="table table-{{ t.id }} {% if t.status != 'AVAILABLE' %}booked{% endif %}"
               data-id="{{ t.id }}"
@@ -596,6 +622,32 @@
 
             <div id="selectedTableInfo" class="mt-2 text-slate-700"></div>
 
+            <!-- THÔNG TIN NGƯỜI ĐẶT -->
+            <div class="mt-5 grid grid-cols-2 gap-3 text-left" style="font-size:15px">
+              <div>
+                <label class="bk-label" for="bkName">Họ tên</label>
+                <input id="bkName" class="bk-field" maxlength="100" placeholder="Nguyễn Văn A" autocomplete="name">
+              </div>
+              <div>
+                <label class="bk-label" for="bkPhone">Số điện thoại</label>
+                <input id="bkPhone" class="bk-field" maxlength="15" inputmode="tel" placeholder="09xx xxx xxx" autocomplete="tel">
+              </div>
+              <div>
+                <label class="bk-label" for="bkDate">Ngày đến</label>
+                <input id="bkDate" type="date" class="bk-field">
+              </div>
+              <div>
+                <label class="bk-label" for="bkTime">Giờ đến</label>
+                <input id="bkTime" type="time" class="bk-field" min="10:00" max="21:30" value="18:00">
+              </div>
+              <div class="col-span-2">
+                <label class="bk-label" for="bkNote">Ghi chú (không bắt buộc)</label>
+                <input id="bkNote" class="bk-field" maxlength="300" placeholder="VD: sinh nhật, cần ghế trẻ em...">
+              </div>
+            </div>
+
+            <p id="bookError" class="hidden mt-3 text-sm font-bold text-red-600"></p>
+
             <button
               type="button"
               onclick="confirmTableBooking()"
@@ -615,15 +667,6 @@
     <!-- ========================================================= -->
 
 <script>
-      function goToContact() {
-      switchView('view-contact');
-
-      // Tô sáng đúng nút LIÊN HỆ tuỳ đang là khách hàng hay nhân viên
-      const isCustomer =
-        !document.getElementById('customerMenu').classList.contains('hidden');
-
-      setActiveMenu(isCustomer ? 'customer-nav-contact' : 'nav-contact');
-    }
     // =========================================================
     // GỢI Ý BÀN
     // =========================================================
@@ -1128,48 +1171,59 @@ if (type === 'VIP') {
     // XÁC NHẬN ĐẶT BÀN
     // =========================================================
 
-    function confirmTableBooking() {
+    async function confirmTableBooking() {
 
       if (!selectedTableId) {
         alert('Vui lòng chọn một bàn trước!');
         return;
       }
 
-
       const guests =
         parseInt(document.getElementById('guestCount').value || '0');
-
 
       const tableEl =
         document.querySelector(
           `.floor-map .table[data-id="${selectedTableId}"]`
         );
 
-
       if (!tableEl) {
         alert('Không tìm thấy thông tin bàn!');
         return;
       }
 
+      const errBox = document.getElementById('bookError');
+      errBox.classList.add('hidden');
 
-      const confirmBooking = confirm(
-        `Xác nhận đặt bàn ${selectedTableId} cho ${guests} khách?`
-      );
+      const body = {
+        table_id: selectedTableId,
+        guests: guests,
+        customer_name: document.getElementById('bkName').value,
+        phone: document.getElementById('bkPhone').value,
+        date: document.getElementById('bkDate').value,
+        time: document.getElementById('bkTime').value,
+        note: document.getElementById('bkNote').value
+      };
 
+      let data;
 
-      if (!confirmBooking) {
+      try {
+        const response = await fetch('/api/book-table', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        data = await response.json();
+      } catch (error) {
+        data = { success: false, message: 'Không kết nối được máy chủ, vui lòng thử lại.' };
+      }
+
+      if (!data.success) {
+        errBox.textContent = data.message || 'Không đặt được bàn.';
+        errBox.classList.remove('hidden');
         return;
       }
 
-
-      /*
-       * Hiện tại file app.py bạn gửi chưa có API
-       * /api/book-table nên bước này chỉ cập nhật giao diện.
-       *
-       * Khi bạn thêm API lưu đặt bàn vào Flask,
-       * có thể thay phần này bằng fetch().
-       */
-
+      // Đặt thành công: đánh dấu bàn đã đặt trên sơ đồ
       tableEl.classList.remove('suitable');
       tableEl.classList.remove('selected');
       tableEl.classList.add('booked');
@@ -1185,6 +1239,8 @@ if (type === 'VIP') {
       document.getElementById('selectedTable')
         .classList.add('hidden');
 
+      const r = data.reservation;
+      const dateText = r.date.slice(8) + '/' + r.date.slice(5, 7) + '/' + r.date.slice(0, 4);
 
       document.getElementById('tableResult').innerHTML = `
         <div class="bg-emerald-950/40 border border-emerald-800 rounded-xl p-4">
@@ -1195,8 +1251,12 @@ if (type === 'VIP') {
           </p>
 
           <p class="text-white mt-1">
-            Bàn <b>${bookedId}</b> đã được chọn cho
-            <b>${guests}</b> khách.
+            Bàn <b>${bookedId}</b> cho <b>${guests}</b> khách,
+            lúc <b>${r.time}</b> ngày <b>${dateText}</b>.
+          </p>
+
+          <p class="text-slate-400 text-xs mt-2">
+            Nhà hàng sẽ gọi xác nhận qua số điện thoại bạn đã nhập.
           </p>
 
         </div>
@@ -1205,5 +1265,17 @@ if (type === 'VIP') {
     }
 
 
-    // =========================================================
+    // Giá trị mặc định cho form đặt bàn: ngày hôm nay (giờ máy khách)
+    (function initBookingForm() {
+      const d = new Date();
+      const today = d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+      const dateEl = document.getElementById('bkDate');
+      if (dateEl) {
+        dateEl.min = today;
+        dateEl.value = today;
+      }
+    })();
+
 </script>
