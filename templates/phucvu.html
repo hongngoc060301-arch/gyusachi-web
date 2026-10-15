@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phục vụ - Gyu Sachi</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: #050505; }
+    .side-btn.active { background: #dc2626; color: #fff; }
+    .table-card { transition: .2s; }
+    .table-card:hover { transform: translateY(-4px); }
+    .chip.active { background: #dc2626; border-color: #dc2626; color: #fff; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 h-screen overflow-hidden">
+
+<div class="flex h-screen">
+
+  <!-- ================= THANH BÊN TRÁI ================= -->
+  <aside class="w-60 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
+
+    <div class="p-5 border-b border-slate-800">
+      <p class="text-red-500 font-black tracking-[0.3em] text-xs">GYU SACHI</p>
+      <h1 class="text-lg font-black text-white mt-1">PHỤC VỤ</h1>
+      <p class="text-xs text-slate-400 mt-2">
+        <i class="fa-solid fa-user mr-1 text-amber-400"></i>
+        {{ staff.name }} · {{ staff.role }}
+      </p>
+    </div>
+
+    <nav class="p-3 space-y-2 flex-1">
+      <button id="side-all" onclick="setFloor('all')"
+        class="side-btn w-full text-left px-4 py-3 rounded-xl font-bold text-sm text-slate-300 hover:bg-slate-800 transition">
+        <i class="fa-solid fa-table-cells-large mr-2"></i>TẤT CẢ
+      </button>
+      <button id="side-1" onclick="setFloor(1)"
+        class="side-btn w-full text-left px-4 py-3 rounded-xl font-bold text-sm text-slate-300 hover:bg-slate-800 transition">
+        <i class="fa-solid fa-building mr-2"></i>TẦNG 1
+      </button>
+      <button id="side-2" onclick="setFloor(2)"
+        class="side-btn w-full text-left px-4 py-3 rounded-xl font-bold text-sm text-slate-300 hover:bg-slate-800 transition">
+        <i class="fa-solid fa-building mr-2"></i>TẦNG 2
+      </button>
+
+      <div class="pt-4 px-2 space-y-2 text-[11px] text-slate-400">
+        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded border-2 border-slate-600 bg-slate-900"></span>Bàn trống</div>
+        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded border-2 border-red-500 bg-red-950"></span>Đang có khách</div>
+      </div>
+    </nav>
+
+    <div class="p-3 border-t border-slate-800">
+      <a href="/#staff-choice"
+        class="block text-center px-4 py-3 rounded-xl border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-800 transition">
+        <i class="fa-solid fa-right-from-bracket mr-2"></i>ĐĂNG XUẤT
+      </a>
+    </div>
+  </aside>
+
+  <!-- ================= KHU BÊN PHẢI ================= -->
+  <main class="flex-1 overflow-y-auto p-6">
+
+    <h2 id="floorTitle" class="text-2xl font-black text-white uppercase tracking-wider mb-6">TẤT CẢ BÀN</h2>
+
+    <div id="tableGrid" class="space-y-8"></div>
+  </main>
+</div>
+
+
+<!-- ================= MÀN HÌNH GỌI MÓN (toàn màn hình) ================= -->
+<div id="orderModal" class="hidden fixed inset-0 z-50 bg-slate-950 flex flex-col">
+
+  <!-- Thanh đầu -->
+  <header class="shrink-0 flex items-center gap-4 px-5 py-3 border-b border-slate-800 bg-slate-900">
+    <div>
+      <p class="text-[10px] text-slate-400 uppercase tracking-widest">Bàn</p>
+      <h3 id="mTableId" class="text-3xl font-black text-red-500 leading-none"></h3>
+    </div>
+    <div class="flex-1 min-w-0">
+      <p id="mTableInfo" class="text-sm text-slate-300 truncate"></p>
+      <div id="mOrderInfo" class="flex flex-wrap gap-2 mt-1"></div>
+    </div>
+    <button id="changeBtn" onclick="showChangeModal()"
+      class="hidden px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-bold text-sm transition">
+      <i class="fa-solid fa-ticket mr-2"></i>ĐỔI VÉ
+    </button>
+    <button onclick="closeModal()"
+      class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-red-600 font-bold text-sm transition">
+      <i class="fa-solid fa-xmark mr-2"></i>ĐÓNG
+    </button>
+  </header>
+
+  <!-- ===== A. FORM MỞ BÀN (bàn chưa có khách) ===== -->
+  <section id="openForm" class="hidden flex-1 overflow-y-auto p-6">
+    <div class="max-w-3xl mx-auto space-y-8">
+
+      <div>
+        <h4 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">1. Số khách</h4>
+        <div class="flex items-center gap-4">
+          <button onclick="changeGuests(-1)" class="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 text-2xl font-black">−</button>
+          <span id="guestCount" class="text-4xl font-black w-16 text-center">2</span>
+          <button onclick="changeGuests(1)" class="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 text-2xl font-black">+</button>
+          <span id="guestHint" class="text-xs text-amber-400"></span>
+        </div>
+      </div>
+
+      <div>
+        <h4 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">2. Gói buffet đồ ăn</h4>
+        <div id="foodChips" class="flex flex-wrap gap-3"></div>
+      </div>
+
+      <div>
+        <h4 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">3. Gói buffet nước</h4>
+        <div id="drinkChips" class="flex flex-wrap gap-3"></div>
+        <p id="drinkHint" class="text-xs text-slate-500 mt-2"></p>
+      </div>
+
+      <div id="openError" class="hidden text-sm text-red-400"></div>
+
+      <button onclick="submitOpen()"
+        class="px-10 py-4 rounded-2xl bg-red-600 hover:bg-red-500 font-black tracking-wider transition">
+        <i class="fa-solid fa-door-open mr-2"></i>MỞ BÀN
+      </button>
+    </div>
+  </section>
+
+  <!-- ===== B. GỌI MÓN (bàn đã có khách) ===== -->
+  <section id="orderView" class="hidden flex-1 min-h-0 flex flex-col lg:flex-row">
+
+    <!-- Bên trái: thực đơn -->
+    <div class="flex-1 min-w-0 min-h-0 flex flex-col">
+
+      <div class="shrink-0 px-4 pt-3 space-y-3 border-b border-slate-800 pb-3">
+        <div id="menuTabs" class="flex gap-2"></div>
+
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+          <input id="searchBox" oninput="onSearch(this.value)" placeholder="Tìm món..."
+            class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-red-500 outline-none text-sm">
+        </div>
+
+        <div id="catChips" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
+      </div>
+
+      <div id="menuGrid" class="flex-1 overflow-y-auto p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start"></div>
+    </div>
+
+    <!-- Bên phải: giỏ + món đã gọi -->
+    <aside class="lg:w-[24rem] shrink-0 min-h-0 max-h-[45vh] lg:max-h-none flex flex-col border-t lg:border-t-0 lg:border-l border-slate-800 bg-slate-900">
+
+      <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-5">
+
+        <div>
+          <h4 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-2">
+            <i class="fa-solid fa-cart-shopping mr-1"></i>Chờ gửi bếp
+          </h4>
+          <div id="cartList" class="space-y-2"></div>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-2">
+            <i class="fa-solid fa-bell-concierge mr-1"></i>Đã gọi
+          </h4>
+          <div id="sentList" class="space-y-2"></div>
+        </div>
+      </div>
+
+      <div class="shrink-0 p-4 border-t border-slate-800 space-y-2">
+        <div id="cartTotal" class="flex justify-between text-sm text-slate-300"></div>
+        <button id="sendBtn" onclick="sendToKitchen()"
+          class="w-full py-3.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 font-black tracking-wider transition">
+          <i class="fa-solid fa-paper-plane mr-2"></i>GỬI BẾP
+        </button>
+        <p class="text-[11px] text-slate-500 text-center pt-1"><i class="fa-solid fa-cash-register mr-1"></i>Khách xong bữa, báo Thu ngân để thanh toán</p>
+      </div>
+    </aside>
+  </section>
+</div>
+
+
+<!-- ================= HỘP ĐỔI VÉ BUFFET ================= -->
+<div id="changeModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+    <h4 class="text-lg font-black text-white"><i class="fa-solid fa-ticket mr-2 text-amber-400"></i>Đổi vé buffet</h4>
+    <p class="text-xs text-slate-400 mt-1">Món đã gọi vẫn giữ nguyên. Vé mới áp dụng cho cả bàn.</p>
+
+    <h5 class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-5 mb-2">Buffet đồ ăn</h5>
+    <div id="chgFood" class="flex flex-wrap gap-3"></div>
+
+    <h5 class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-5 mb-2">Buffet nước</h5>
+    <div id="chgDrink" class="flex flex-wrap gap-3"></div>
+
+    <div id="chgError" class="hidden text-sm text-red-400 mt-4"></div>
+
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeChange()" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+      <button onclick="submitChange()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">XÁC NHẬN ĐỔI</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================= HỘP CHỌN MÓN CHO COMBO (ví dụ chọn loại lẩu) ================= -->
+<div id="choiceModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6">
+    <h4 id="choiceTitle" class="text-lg font-black text-white"></h4>
+    <p class="text-xs text-slate-400 mt-1">Chọn món khách muốn dùng trong combo:</p>
+    <div id="choiceBody" class="mt-4 space-y-4"></div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeChoice()" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+      <button onclick="confirmChoice()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">THÊM VÀO GIỎ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Thông báo nhỏ -->
+<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl"></div>
+
+
+<script>
+  const STAFF_ID = "{{ staff.id }}";
+  let TABLES = {{ tables|tojson }};
+  let currentFloor = 'all';
+
+  // trạng thái màn hình gọi món
+  let CUR_TABLE = null;       // bàn đang mở
+  let ORDER = null;           // đơn đang mở của bàn (null nếu bàn trống)
+  let CART = [];              // món chờ gửi bếp
+  let PACKAGES = null;        // danh sách gói buffet
+  let MENU = {};              // bộ nhớ đệm thực đơn
+  let ITEM_INDEX = {};        // 'type:id' -> món
+  let tab = 'food', cat = 'ALL', search = '';
+  let openForm = { guests: 2, food: null, drink: null };
+  let pendingChoice = null;   // combo đang chờ chọn món
+
+  const STATUS_TEXT = { NEW: 'Chờ bếp', DOING: 'Đang làm', DONE: 'Đã xong', CANCELLED: 'Đã huỷ' };
+  const STATUS_CLASS = {
+    NEW:       'bg-red-950/60 text-red-300 border-red-800/50',
+    DOING:     'bg-amber-950/60 text-amber-300 border-amber-700/50',
+    DONE:      'bg-emerald-950/60 text-emerald-300 border-emerald-700/50',
+    CANCELLED: 'bg-slate-800 text-slate-500 border-slate-700 line-through'
+  };
+
+
+  // ============ TIỆN ÍCH ============
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function money(n) { return Number(n).toLocaleString('vi-VN') + 'đ'; }
+
+  async function api(url, body) {
+    const opt = body === undefined ? {} : {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    };
+    try {
+      const res = await fetch(url, opt);
+      return await res.json();
+    } catch (e) {
+      return { success: false, message: 'Mất kết nối tới máy chủ.' };
+    }
+  }
+
+  let toastTimer = null;
+  function toast(msg, ok) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl ' +
+      (ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
+  }
+
+
+  // ============ CHỌN TẦNG ============
+  function setFloor(f) {
+    currentFloor = f;
+
+    document.querySelectorAll('.side-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('side-' + f).classList.add('active');
+
+    document.getElementById('floorTitle').textContent =
+      f === 'all' ? 'TẤT CẢ BÀN' : 'BÀN TẦNG ' + f;
+
+    renderTables();
+  }
+
+
+  // ============ HIỂN THỊ DANH SÁCH BÀN ============
+  function renderTables() {
+    const grid = document.getElementById('tableGrid');
+    const floors = currentFloor === 'all' ? [1, 2] : [currentFloor];
+
+    grid.innerHTML = floors.map(function(floor) {
+
+      const list = TABLES.filter(t => t.floor === floor);
+
+      const cards = list.map(function(t) {
+        const isVip = t.type === 'VIP';
+        const busy = t.status === 'OCCUPIED';
+
+        const style = busy
+          ? 'border-red-500 bg-red-950/50'
+          : 'border-slate-700 bg-slate-900 hover:border-red-500';
+
+        const sub = busy
+          ? `<span class="text-red-300 font-bold">ĐANG DÙNG${t.guests ? ' · ' + t.guests + ' khách' : ''}</span>`
+          : (isVip ? 'VIP' : t.capacity + ' chỗ');
+
+        return `
+          <button onclick="openTable('${esc(t.id)}')"
+            class="table-card rounded-2xl border-2 ${style} p-4 text-center">
+            <div class="text-2xl font-black text-white">
+              ${isVip ? '<i class="fa-solid fa-crown text-amber-400 text-base mr-1"></i>' : ''}${esc(t.id)}
+            </div>
+            <div class="text-xs mt-1 text-slate-400">${sub}</div>
+          </button>`;
+      }).join('');
+
+      return `
+        <section>
+          <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">
+            <i class="fa-solid fa-building mr-2 text-red-500"></i>Tầng ${floor}
+          </h3>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">${cards}</div>
+        </section>`;
+    }).join('');
+  }
+
+  async function refreshTables() {
+    const r = await api('/api/tables');
+    if (r.tables) {
+      TABLES = r.tables;
+      renderTables();
+    }
+  }
+
+
+  // ============ BẤM VÀO BÀN ============
+  async function openTable(id) {
+    CUR_TABLE = TABLES.find(x => x.id === id);
+    CART = [];
+    ORDER = null;
+    tab = 'food'; cat = 'ALL'; search = '';
+    document.getElementById('searchBox').value = '';
+
+    document.getElementById('mTableId').textContent = CUR_TABLE.id;
+    document.getElementById('mTableInfo').textContent =
+      'Tầng ' + CUR_TABLE.floor + ' · ' + (CUR_TABLE.type === 'VIP' ? 'Phòng VIP' : CUR_TABLE.capacity + ' chỗ');
+    document.getElementById('mOrderInfo').innerHTML = '';
+
+    document.getElementById('orderModal').classList.remove('hidden');
+    document.getElementById('openForm').classList.add('hidden');
+    document.getElementById('orderView').classList.add('hidden');
+    document.getElementById('changeBtn').classList.add('hidden');
+
+    const r = await api('/api/orders/by-table/' + encodeURIComponent(id));
+
+    if (r.order) {
+      ORDER = r.order;
+      showOrderView();
+    } else {
+      await showOpenForm();
+    }
+  }
+
+  function closeModal() {
+    document.getElementById('orderModal').classList.add('hidden');
+    ORDER = null;
+    CUR_TABLE = null;
+    CART = [];
+    refreshTables();
+  }
+
+
+  // =========================================================
+  // A. FORM MỞ BÀN
+  // =========================================================
+  async function showOpenForm() {
+    if (!PACKAGES) {
+      PACKAGES = await api('/api/packages');
+    }
+
+    // mặc định số khách: nửa sức chứa (VIP thì lấy số tối thiểu)
+    openForm = {
+      guests: CUR_TABLE.type === 'VIP' ? (CUR_TABLE.min_capacity || 8) : Math.min(2, CUR_TABLE.capacity),
+      food: null,
+      drink: null
+    };
+
+    document.getElementById('openError').classList.add('hidden');
+    renderOpenForm();
+    document.getElementById('openForm').classList.remove('hidden');
+  }
+
+  function changeGuests(d) {
+    openForm.guests = Math.max(1, Math.min(60, openForm.guests + d));
+    renderOpenForm();
+  }
+
+  function pickFood(id) { openForm.food = id; renderOpenForm(); }
+  function pickDrink(id) { openForm.drink = id; renderOpenForm(); }
+
+  function chipHtml(label, sub, active, onclick, disabled) {
+    return `
+      <button ${disabled ? 'disabled' : ''} onclick="${onclick}"
+        class="chip ${active ? 'active' : ''} min-w-[8rem] px-5 py-3 rounded-2xl border-2 border-slate-700 bg-slate-900
+               ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:border-red-500'} text-center transition">
+        <div class="font-black">${label}</div>
+        ${sub ? `<div class="text-[11px] mt-0.5 ${active ? 'text-red-100' : 'text-slate-400'}">${sub}</div>` : ''}
+      </button>`;
+  }
+
+  function renderOpenForm() {
+    document.getElementById('guestCount').textContent = openForm.guests;
+
+    const hint = document.getElementById('guestHint');
+    if (openForm.guests > CUR_TABLE.capacity) {
+      hint.textContent = 'Vượt sức chứa của bàn (' + CUR_TABLE.capacity + ' chỗ)';
+    } else if (CUR_TABLE.type === 'VIP' && openForm.guests < (CUR_TABLE.min_capacity || 8)) {
+      hint.textContent = 'Phòng VIP nhận từ ' + (CUR_TABLE.min_capacity || 8) + ' khách';
+    } else {
+      hint.textContent = '';
+    }
+
+    // gói đồ ăn
+    document.getElementById('foodChips').innerHTML =
+      PACKAGES.food.map(p =>
+        chipHtml(Math.round(p.price / 1000) + 'K', 'Buffet', openForm.food === p.id, `pickFood(${p.id})`)
+      ).join('') +
+      chipHtml('Chỉ gọi lẻ', 'Không buffet', openForm.food === null, 'pickFood(null)');
+
+    // gói nước
+    document.getElementById('drinkChips').innerHTML =
+      PACKAGES.drink.map(p => {
+        const label = Math.round(p.price / 1000) + 'K';
+        const sub = p.name.includes('(') ? p.name.slice(p.name.indexOf('(') + 1, -1) : p.name.replace('Buffet ', '');
+        return chipHtml(label, sub + (p.today_ok ? '' : ' · không áp dụng hôm nay'),
+                        openForm.drink === p.id, `pickDrink(${p.id})`, !p.today_ok);
+      }).join('') +
+      chipHtml('Không', 'Không buffet nước', openForm.drink === null, 'pickDrink(null)');
+
+    const days = ['', 'thứ 2', 'thứ 3', 'thứ 4', 'thứ 5', 'thứ 6', 'thứ 7', 'chủ nhật'];
+    document.getElementById('drinkHint').textContent =
+      'Hôm nay là ' + days[PACKAGES.today] + ': buffet nước 49K áp dụng T2–T5, 69K áp dụng T6–CN, 139K áp dụng cả tuần.';
+  }
+
+  async function submitOpen() {
+    const err = document.getElementById('openError');
+    err.classList.add('hidden');
+
+    const r = await api('/api/orders/open', {
+      table_id: CUR_TABLE.id,
+      staff_id: STAFF_ID,
+      guests: openForm.guests,
+      package_id: openForm.food,
+      drink_package_id: openForm.drink
+    });
+
+    if (!r.success) {
+      err.textContent = r.message;
+      err.classList.remove('hidden');
+      return;
+    }
+
+    ORDER = r.order;
+    toast('Đã mở bàn ' + CUR_TABLE.id, true);
+    refreshTables();
+    showOrderView();
+  }
+
+
+  // =========================================================
+  // B. GỌI MÓN
+  // =========================================================
+  function showOrderView() {
+    document.getElementById('openForm').classList.add('hidden');
+    document.getElementById('orderView').classList.remove('hidden');
+    document.getElementById('changeBtn').classList.remove('hidden');
+
+    // tab mặc định
+    tab = ORDER.package_id ? 'food' : (ORDER.drink_package_id ? 'drink' : 'alacarte');
+    cat = 'ALL';
+
+    renderOrderInfo();
+    renderTabs();
+    loadAndRenderMenu();
+    renderCart();
+    renderSent();
+  }
+
+  function renderOrderInfo() {
+    const chips = [];
+    chips.push(`<span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-[11px] font-bold">
+                  <i class="fa-solid fa-users mr-1 text-amber-400"></i>${ORDER.guests} khách</span>`);
+    chips.push(`<span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-[11px] font-bold">
+                  <i class="fa-regular fa-clock mr-1 text-amber-400"></i>Mở lúc ${esc(ORDER.opened_at)}</span>`);
+    chips.push(ORDER.package_name
+      ? `<span class="px-2.5 py-0.5 rounded-full bg-red-950/70 border border-red-800/50 text-red-300 text-[11px] font-bold">${esc(ORDER.package_name)}</span>`
+      : `<span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[11px] font-bold">Chỉ gọi lẻ</span>`);
+    if (ORDER.drink_name) {
+      chips.push(`<span class="px-2.5 py-0.5 rounded-full bg-sky-950/70 border border-sky-800/50 text-sky-300 text-[11px] font-bold">${esc(ORDER.drink_name)}</span>`);
+    }
+    document.getElementById('mOrderInfo').innerHTML = chips.join('');
+  }
+
+  function renderTabs() {
+    const tabs = [];
+    if (ORDER.package_id)       tabs.push(['food',  'fa-utensils',   'Buffet đồ ăn']);
+    if (ORDER.drink_package_id) tabs.push(['drink', 'fa-martini-glass-citrus', 'Buffet nước']);
+    tabs.push(['alacarte', 'fa-receipt', 'Gọi lẻ / Combo / Nước']);
+
+    document.getElementById('menuTabs').innerHTML = tabs.map(t => `
+      <button onclick="setTab('${t[0]}')"
+        class="chip ${tab === t[0] ? 'active' : ''} px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 text-sm font-bold hover:border-red-500 transition">
+        <i class="fa-solid ${t[1]} mr-2"></i>${t[2]}
+      </button>`).join('');
+  }
+
+  function setTab(t) {
+    tab = t; cat = 'ALL';
+    renderTabs();
+    loadAndRenderMenu();
+  }
+
+  function onSearch(v) { search = v.trim().toLowerCase(); renderMenu(); }
+  function setCat(c) { cat = c; renderMenu(); }
+
+  function currentMenuKey() {
+    if (tab === 'food')  return ['pkg-' + ORDER.package_id,       '/api/menu/package/' + ORDER.package_id];
+    if (tab === 'drink') return ['pkg-' + ORDER.drink_package_id, '/api/menu/package/' + ORDER.drink_package_id];
+    return ['alacarte', '/api/menu/alacarte'];
+  }
+
+  async function loadAndRenderMenu() {
+    const [key, url] = currentMenuKey();
+    document.getElementById('menuGrid').innerHTML =
+      '<p class="col-span-full text-center text-slate-500 text-sm mt-10">Đang tải thực đơn...</p>';
+
+    if (!MENU[key]) {
+      const r = await api(url);
+      MENU[key] = r.categories || [];
+    }
+    renderMenu();
+  }
+
+  function cartQtyOf(type, id) {
+    return CART.filter(c => c.type === type && c.id === id).reduce((s, c) => s + c.qty, 0);
+  }
+
+  function renderMenu() {
+    const [key] = currentMenuKey();
+    const cats = MENU[key] || [];
+    const type = tab === 'alacarte' ? 'ALACARTE' : 'PACKAGE';
+
+    // chip nhóm món
+    document.getElementById('catChips').innerHTML =
+      [['ALL', 'Tất cả']].concat(cats.map(g => [g.name, g.name])).map(c => `
+        <button data-cat="${esc(c[0])}" onclick="setCat(this.dataset.cat)"
+          class="chip ${cat === c[0] ? 'active' : ''} shrink-0 px-3.5 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500 transition">
+          ${esc(c[1])}
+        </button>`).join('');
+
+    const html = [];
+
+    cats.forEach(function(g) {
+      if (cat !== 'ALL' && cat !== g.name) return;
+
+      const items = g.items.filter(i => !search || i.name.toLowerCase().includes(search));
+      if (!items.length) return;
+
+      html.push(`<h5 class="col-span-full text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">${esc(g.name)}</h5>`);
+
+      items.forEach(function(i) {
+        ITEM_INDEX[type + ':' + i.id] = Object.assign({ type: type }, i);
+        const inCart = cartQtyOf(type, i.id);
+
+        html.push(`
+          <button onclick="addToCart('${type}', ${i.id})"
+            class="relative text-left rounded-2xl border ${inCart ? 'border-red-500 bg-red-950/30' : 'border-slate-800 bg-slate-900 hover:border-slate-600'} p-3.5 transition active:scale-95">
+            ${inCart ? `<span class="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-xs font-black flex items-center justify-center">${inCart}</span>` : ''}
+            ${i.is_combo ? '<span class="text-[10px] font-black text-amber-400 tracking-widest">COMBO / SET</span>' : ''}
+            <div class="font-bold text-sm text-white leading-snug">${esc(i.name)}</div>
+            ${i.price !== undefined ? `<div class="mt-1.5 text-sm font-black text-amber-400">${money(i.price)}</div>` : ''}
+          </button>`);
+      });
+    });
+
+    document.getElementById('menuGrid').innerHTML = html.length
+      ? html.join('')
+      : '<p class="col-span-full text-center text-slate-500 text-sm mt-10">Không tìm thấy món nào.</p>';
+  }
+
+
+  // ============ GIỎ HÀNG ============
+  function cartKey(type, id, choices) {
+    return type + ':' + id + ':' + JSON.stringify(choices || {});
+  }
+
+  function addToCart(type, id) {
+    const item = ITEM_INDEX[type + ':' + id];
+    if (!item) return;
+
+    // combo có món phải chọn (ví dụ lẩu bò hay hải sản) -> hỏi trước
+    if (item.is_combo && item.parts.some(p => p.choices)) {
+      pendingChoice = { item: item, picked: {} };
+      openChoice();
+      return;
+    }
+
+    pushCart(item, {});
+  }
+
+  function pushCart(item, choices) {
+    const key = cartKey(item.type, item.id, choices);
+    const line = CART.find(c => c.key === key);
+
+    if (line) {
+      line.qty = Math.min(99, line.qty + 1);
+    } else {
+      let choiceText = '';
+      if (item.is_combo) {
+        choiceText = item.parts.filter(p => p.choices).map(p => choices[p.id]).join(', ');
+      }
+      CART.push({
+        key: key, type: item.type, id: item.id, name: item.name,
+        price: item.price, qty: 1, choices: choices, choiceText: choiceText
+      });
+    }
+    renderCart();
+    renderMenu();
+  }
+
+  function changeQty(key, d) {
+    const line = CART.find(c => c.key === key);
+    if (!line) return;
+    line.qty += d;
+    if (line.qty <= 0) CART = CART.filter(c => c.key !== key);
+    if (line.qty > 99) line.qty = 99;
+    renderCart();
+    renderMenu();
+  }
+
+  function renderCart() {
+    const box = document.getElementById('cartList');
+
+    box.innerHTML = CART.length ? CART.map(c => `
+      <div class="rounded-xl bg-slate-950 border border-slate-800 p-3">
+        <div class="flex justify-between gap-2">
+          <div class="min-w-0">
+            <div class="font-bold text-sm text-white">${esc(c.name)}</div>
+            ${c.choiceText ? `<div class="text-[11px] text-amber-300">${esc(c.choiceText)}</div>` : ''}
+            ${c.price !== undefined ? `<div class="text-[11px] text-slate-400">${money(c.price)}</div>` : ''}
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button data-key="${esc(c.key)}" onclick="changeQty(this.dataset.key, -1)" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 font-black">−</button>
+            <span class="w-6 text-center font-black">${c.qty}</span>
+            <button data-key="${esc(c.key)}" onclick="changeQty(this.dataset.key, 1)" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 font-black">+</button>
+          </div>
+        </div>
+      </div>`).join('')
+      : '<p class="text-xs text-slate-600">Chưa chọn món. Bấm vào món bên trái để thêm.</p>';
+
+    const money_total = CART.filter(c => c.price !== undefined).reduce((s, c) => s + c.price * c.qty, 0);
+    const count = CART.reduce((s, c) => s + c.qty, 0);
+
+    document.getElementById('cartTotal').innerHTML =
+      `<span>${count} phần</span><span>${money_total ? 'Gọi lẻ: <b class="text-amber-400">' + money(money_total) + '</b>' : ''}</span>`;
+    document.getElementById('sendBtn').disabled = CART.length === 0;
+  }
+
+
+  // ============ HỘP CHỌN MÓN TRONG COMBO ============
+  function openChoice() {
+    const item = pendingChoice.item;
+    document.getElementById('choiceTitle').textContent = item.name;
+
+    document.getElementById('choiceBody').innerHTML = item.parts.filter(p => p.choices).map(p => `
+      <div>
+        <p class="text-sm font-bold text-slate-300 mb-2">${esc(p.name)}</p>
+        <div class="flex flex-wrap gap-2">
+          ${p.choices.map(ch => `
+            <button data-part="${p.id}" data-choice="${esc(ch)}" onclick="pickChoice(${p.id}, this)"
+              class="choice-btn chip px-4 py-2 rounded-xl border border-slate-700 bg-slate-950 text-sm font-bold hover:border-red-500">
+              ${esc(ch)}
+            </button>`).join('')}
+        </div>
+      </div>`).join('');
+
+    document.getElementById('choiceModal').classList.remove('hidden');
+  }
+
+  function pickChoice(partId, btn) {
+    pendingChoice.picked[partId] = btn.dataset.choice;
+    document.querySelectorAll('.choice-btn[data-part="' + partId + '"]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  function closeChoice() {
+    document.getElementById('choiceModal').classList.add('hidden');
+    pendingChoice = null;
+  }
+
+  function confirmChoice() {
+    const item = pendingChoice.item;
+    const missing = item.parts.filter(p => p.choices && !pendingChoice.picked[p.id]);
+
+    if (missing.length) {
+      toast('Hãy chọn: ' + missing[0].name, false);
+      return;
+    }
+
+    pushCart(item, pendingChoice.picked);
+    closeChoice();
+  }
+
+
+  // ============ GỬI BẾP ============
+  async function sendToKitchen() {
+    if (!CART.length || !ORDER) return;
+
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+
+    const r = await api('/api/orders/' + ORDER.id + '/items', {
+      items: CART.map(c => ({ type: c.type, id: c.id, qty: c.qty, choices: c.choices }))
+    });
+
+    if (!r.success) {
+      toast(r.message, false);
+      btn.disabled = false;
+      return;
+    }
+
+    CART = [];
+    ORDER = r.order;
+    toast('Đã gửi món xuống bếp', true);
+    renderCart();
+    renderMenu();
+    renderSent();
+  }
+
+
+  // ============ MÓN ĐÃ GỌI ============
+  // Combo gồm nhiều món con -> trạng thái chung suy ra từ các món con
+  function comboStatus(children) {
+    const live = children.filter(c => c.status !== 'CANCELLED');
+    if (!live.length) return 'CANCELLED';
+    if (live.every(c => c.status === 'DONE')) return 'DONE';
+    if (live.every(c => c.status === 'NEW')) return 'NEW';
+    return 'DOING';
+  }
+
+  function statusChip(status) {
+    return `<span class="shrink-0 px-2 py-0.5 rounded-full border text-[10px] font-bold ${STATUS_CLASS[status]}">${STATUS_TEXT[status]}</span>`;
+  }
+
+  function renderSent() {
+    const box = document.getElementById('sentList');
+    if (!ORDER) return;
+
+    const top = ORDER.items.filter(i => i.parent_id === null).slice().reverse();   // món mới nhất lên đầu
+
+    if (!top.length) {
+      box.innerHTML = '<p class="text-xs text-slate-600">Chưa gọi món nào.</p>';
+      return;
+    }
+
+    box.innerHTML = top.map(function(i) {
+      const children = ORDER.items.filter(c => c.parent_id === i.id);
+      const isCombo = i.kind === 'COMBO';
+      const status = isCombo ? comboStatus(children) : i.status;
+      const canCancel = status === 'NEW';
+
+      const kids = isCombo ? `
+        <ul class="mt-2 space-y-1 border-l-2 border-slate-800 pl-3">
+          ${children.map(c => `
+            <li class="flex justify-between gap-2 text-[11px] ${c.status === 'CANCELLED' ? 'text-slate-600 line-through' : 'text-slate-400'}">
+              <span>${esc(c.name)} ×${c.qty}</span>
+              <span class="${c.status === 'DONE' ? 'text-emerald-400' : c.status === 'DOING' ? 'text-amber-400' : ''}">${STATUS_TEXT[c.status]}</span>
+            </li>`).join('')}
+        </ul>` : '';
+
+      return `
+        <div class="rounded-xl bg-slate-950 border border-slate-800 p-3 ${status === 'CANCELLED' ? 'opacity-50' : ''}">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-sm font-bold ${status === 'CANCELLED' ? 'line-through text-slate-500' : 'text-white'}">
+                ${esc(i.name)} <span class="text-amber-400">×${i.qty}</span>
+              </div>
+              <div class="text-[11px] text-slate-500">
+                ${esc(i.time)}${i.unit_price ? ' · ' + money(i.unit_price * i.qty) : ''}${isCombo ? ' · combo' : ''}
+              </div>
+            </div>
+            ${statusChip(status)}
+          </div>
+          ${kids}
+          ${canCancel ? `<button onclick="cancelItem(${i.id})" class="mt-2 text-[11px] text-slate-500 hover:text-red-400 underline">Huỷ món</button>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  async function cancelItem(id) {
+    if (!confirm('Huỷ món này?')) return;
+    const r = await api('/api/order-items/' + id + '/cancel', {});
+    if (!r.success) {
+      toast(r.message, false);
+      return;
+    }
+    ORDER = r.order;
+    renderSent();
+    toast('Đã huỷ món', true);
+  }
+
+
+  // ============ ĐỔI VÉ BUFFET ============
+  let chg = { food: null, drink: null };
+
+  async function showChangeModal() {
+    if (!ORDER) return;
+    if (!PACKAGES) PACKAGES = await api('/api/packages');
+    chg = { food: ORDER.package_id, drink: ORDER.drink_package_id };
+    document.getElementById('chgError').classList.add('hidden');
+    renderChange();
+    document.getElementById('changeModal').classList.remove('hidden');
+  }
+
+  function closeChange() { document.getElementById('changeModal').classList.add('hidden'); }
+  function chgFood(id) { chg.food = id; renderChange(); }
+  function chgDrink(id) { chg.drink = id; renderChange(); }
+
+  function renderChange() {
+    document.getElementById('chgFood').innerHTML =
+      PACKAGES.food.map(p =>
+        chipHtml(Math.round(p.price / 1000) + 'K', p.id === ORDER.package_id ? 'Đang dùng' : 'Buffet',
+                 chg.food === p.id, `chgFood(${p.id})`)
+      ).join('') +
+      chipHtml('Chỉ gọi lẻ', ORDER.package_id === null ? 'Đang dùng' : 'Không buffet', chg.food === null, 'chgFood(null)');
+
+    document.getElementById('chgDrink').innerHTML =
+      PACKAGES.drink.map(p => {
+        const sub = p.name.includes('(') ? p.name.slice(p.name.indexOf('(') + 1, -1) : p.name.replace('Buffet ', '');
+        const ok = p.today_ok || p.id === ORDER.drink_package_id;
+        return chipHtml(Math.round(p.price / 1000) + 'K',
+                        sub + (p.id === ORDER.drink_package_id ? ' · đang dùng' : (p.today_ok ? '' : ' · không áp dụng hôm nay')),
+                        chg.drink === p.id, `chgDrink(${p.id})`, !ok);
+      }).join('') +
+      chipHtml('Không', ORDER.drink_package_id === null ? 'Đang dùng' : 'Không buffet nước', chg.drink === null, 'chgDrink(null)');
+  }
+
+  async function submitChange() {
+    const err = document.getElementById('chgError');
+    err.classList.add('hidden');
+
+    const r = await api('/api/orders/' + ORDER.id + '/change-package', {
+      package_id: chg.food, drink_package_id: chg.drink
+    });
+    if (!r.success) {
+      err.textContent = r.message || 'Không đổi được vé';
+      err.classList.remove('hidden');
+      return;
+    }
+
+    ORDER = r.order;
+
+    // bỏ khỏi giỏ những món buffet không còn thuộc vé mới
+    const ids = [ORDER.package_id, ORDER.drink_package_id].filter(x => x);
+    const valid = new Set();
+    for (const pid of ids) {
+      const key = 'pkg-' + pid;
+      if (!MENU[key]) MENU[key] = (await api('/api/menu/package/' + pid)).categories || [];
+      MENU[key].forEach(g => g.items.forEach(i => valid.add(i.id)));
+    }
+    const before = CART.length;
+    CART = CART.filter(c => c.type !== 'PACKAGE' || valid.has(c.id));
+
+    closeChange();
+    tab = ORDER.package_id ? 'food' : (ORDER.drink_package_id ? 'drink' : 'alacarte');
+    cat = 'ALL';
+    renderOrderInfo(); renderTabs(); loadAndRenderMenu(); renderCart(); renderSent();
+    refreshTables();
+    toast('Đã đổi vé buffet' + (CART.length < before ? ' (đã bỏ món không thuộc vé mới khỏi giỏ)' : ''), true);
+  }
+
+
+  // ============ TỰ CẬP NHẬT (mỗi 5 giây) ============
+  setInterval(async function() {
+    const modalOpen = !document.getElementById('orderModal').classList.contains('hidden');
+
+    if (modalOpen && ORDER) {
+      // cập nhật trạng thái món (bếp đang làm / đã xong)
+      const r = await api('/api/orders/' + ORDER.id);
+      if (r.success && r.order && r.order.status === 'OPEN') {
+        ORDER = r.order;
+        renderSent();
+      } else if (r.success && r.order) {
+        toast('Bàn ' + CUR_TABLE.id + ' đã được thanh toán', true);
+        closeModal();
+      }
+    } else if (!modalOpen) {
+      refreshTables();
+    }
+  }, 5000);
+
+
+  // ============ KHỞI TẠO ============
+  setFloor('all');
+</script>
+
+</body>
+</html>

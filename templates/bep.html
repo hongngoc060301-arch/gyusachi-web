@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bếp - Gyu Sachi</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: #050505; }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 h-screen overflow-hidden">
+
+<div class="flex h-screen">
+
+  <!-- ================= THANH BÊN TRÁI ================= -->
+  <aside class="w-60 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
+
+    <div class="p-5 border-b border-slate-800">
+      <p class="text-red-500 font-black tracking-[0.3em] text-xs">GYU SACHI</p>
+      <h1 class="text-lg font-black text-white mt-1">BẾP</h1>
+    </div>
+
+    <!-- Trạm đang trực -->
+    <div class="p-5 border-b border-slate-800 text-center">
+      <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-950/60 text-3xl text-rose-400">
+        <i class="fa-solid {{ station.icon }}"></i>
+      </div>
+      <h2 class="mt-3 font-black text-white">{{ station.name }}</h2>
+      <p class="text-xs text-slate-400 mt-1">{{ station.desc }}</p>
+      <span class="inline-block mt-3 px-3 py-0.5 bg-slate-950 text-rose-300 rounded-full text-[11px] font-semibold border border-rose-500/30">
+        MÃ: {{ station.id }}
+      </span>
+    </div>
+
+    <!-- Thống kê nhanh -->
+    <div class="p-4 space-y-2 flex-1">
+      <div class="flex items-center justify-between rounded-xl bg-slate-950 border border-slate-800 px-4 py-3">
+        <span class="text-xs text-slate-400">Món mới</span>
+        <span id="count-new" class="font-black text-red-400">0</span>
+      </div>
+      <div class="flex items-center justify-between rounded-xl bg-slate-950 border border-slate-800 px-4 py-3">
+        <span class="text-xs text-slate-400">Đang làm</span>
+        <span id="count-doing" class="font-black text-amber-400">0</span>
+      </div>
+      <div class="flex items-center justify-between rounded-xl bg-slate-950 border border-slate-800 px-4 py-3">
+        <span class="text-xs text-slate-400">Đã xong</span>
+        <span id="count-done" class="font-black text-emerald-400">0</span>
+      </div>
+    </div>
+
+    <div class="p-3 border-t border-slate-800">
+      <a href="/#staff-choice"
+        class="block text-center px-4 py-3 rounded-xl border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-800 transition">
+        <i class="fa-solid fa-right-from-bracket mr-2"></i>ĐĂNG XUẤT
+      </a>
+    </div>
+  </aside>
+
+  <!-- ================= KHU BÊN PHẢI: 3 CỘT ================= -->
+  <main class="flex-1 flex flex-col min-w-0">
+
+    <div class="px-6 py-4 border-b border-slate-800">
+      <h2 class="text-2xl font-black text-white uppercase tracking-wider">MÀN HÌNH NHẬN MÓN</h2>
+      <p class="text-xs text-slate-400 mt-1">Món phục vụ gửi xuống sẽ tự hiện ở đây (cập nhật mỗi 4 giây)</p>
+    </div>
+
+    <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 min-h-0">
+
+      <!-- Cột: MỚI -->
+      <section class="flex flex-col rounded-2xl border border-red-950 bg-slate-900/60 min-h-0">
+        <div class="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+          <h3 class="font-black text-sm tracking-widest text-red-400">MÓN MỚI</h3>
+        </div>
+        <div id="col-new" class="flex-1 overflow-y-auto p-3 space-y-3"></div>
+      </section>
+
+      <!-- Cột: ĐANG LÀM -->
+      <section class="flex flex-col rounded-2xl border border-amber-950 bg-slate-900/60 min-h-0">
+        <div class="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+          <h3 class="font-black text-sm tracking-widest text-amber-400">ĐANG LÀM</h3>
+        </div>
+        <div id="col-doing" class="flex-1 overflow-y-auto p-3 space-y-3"></div>
+      </section>
+
+      <!-- Cột: ĐÃ XONG -->
+      <section class="flex flex-col rounded-2xl border border-emerald-950 bg-slate-900/60 min-h-0">
+        <div class="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          <h3 class="font-black text-sm tracking-widest text-emerald-400">ĐÃ XONG</h3>
+        </div>
+        <div id="col-done" class="flex-1 overflow-y-auto p-3 space-y-3"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+
+<script>
+  const STATION_ID = "{{ station.id }}";
+
+  // Danh sách món của trạm này, lấy từ database (máy chủ trả về).
+  // Mỗi món: { id, table, name, qty, time, status: NEW | DOING | DONE, note }
+  let ORDER_ITEMS = [];
+  let knownIds = new Set();
+  let firstLoad = true;
+
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+
+  // ============ VẼ MỘT THẺ MÓN ============
+  function itemCard(item) {
+
+    let button = '';
+
+    if (item.status === 'NEW') {
+      button = `
+        <button onclick="changeStatus(${item.id}, 'DOING')"
+          class="w-full mt-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition">
+          <i class="fa-solid fa-fire mr-1"></i>BẮT ĐẦU LÀM
+        </button>`;
+    } else if (item.status === 'DOING') {
+      button = `
+        <button onclick="changeStatus(${item.id}, 'DONE')"
+          class="w-full mt-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition">
+          <i class="fa-solid fa-check mr-1"></i>XONG
+        </button>`;
+    }
+
+    return `
+      <div class="rounded-xl bg-slate-950 border border-slate-800 p-4">
+        <div class="flex items-center justify-between">
+          <span class="px-2.5 py-0.5 rounded-full bg-red-950/60 border border-red-800/50 text-red-400 text-xs font-black">
+            BÀN ${esc(item.table)}
+          </span>
+          <span class="text-[11px] text-slate-500">
+            <i class="fa-regular fa-clock mr-1"></i>${esc(item.time)}
+          </span>
+        </div>
+
+        <div class="mt-3 flex items-center justify-between gap-3">
+          <span class="font-bold text-white">${esc(item.name)}</span>
+          <span class="text-xl font-black text-amber-400">x${item.qty}</span>
+        </div>
+
+        ${item.note ? `<p class="mt-1 text-xs text-amber-300">Ghi chú: ${esc(item.note)}</p>` : ''}
+
+        ${button}
+      </div>`;
+  }
+
+
+  // ============ VẼ 3 CỘT ============
+  function renderBoard() {
+
+    const columns = {
+      NEW:   document.getElementById('col-new'),
+      DOING: document.getElementById('col-doing'),
+      DONE:  document.getElementById('col-done')
+    };
+
+    const emptyText = {
+      NEW:   'Chưa có món mới.',
+      DOING: 'Chưa có món đang làm.',
+      DONE:  'Chưa có món nào xong.'
+    };
+
+    Object.keys(columns).forEach(function(status) {
+
+      const list = ORDER_ITEMS.filter(i => i.status === status);
+
+      // món đã xong: mới xong nằm trên cùng
+      if (status === 'DONE') list.reverse();
+
+      columns[status].innerHTML = list.length
+        ? list.map(itemCard).join('')
+        : `<p class="text-center text-xs text-slate-600 mt-6">${emptyText[status]}</p>`;
+    });
+
+    document.getElementById('count-new').textContent   = ORDER_ITEMS.filter(i => i.status === 'NEW').length;
+    document.getElementById('count-doing').textContent = ORDER_ITEMS.filter(i => i.status === 'DOING').length;
+    document.getElementById('count-done').textContent  = ORDER_ITEMS.filter(i => i.status === 'DONE').length;
+  }
+
+
+  // ============ TẢI MÓN TỪ MÁY CHỦ ============
+  async function loadItems() {
+    try {
+      const res = await fetch('/api/kitchen/' + encodeURIComponent(STATION_ID));
+      const data = await res.json();
+      ORDER_ITEMS = data.items || [];
+    } catch (e) {
+      return;      // mất mạng: giữ nguyên màn hình, lần sau thử lại
+    }
+
+    // có món mới về -> kêu "ding" 1 tiếng (trừ lần tải đầu tiên)
+    const fresh = ORDER_ITEMS.filter(i => i.status === 'NEW' && !knownIds.has(i.id));
+    ORDER_ITEMS.forEach(i => knownIds.add(i.id));
+    if (!firstLoad && fresh.length) beep();
+    firstLoad = false;
+
+    renderBoard();
+  }
+
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.start(); osc.stop(ctx.currentTime + 0.5);
+    } catch (e) { /* trình duyệt chặn âm thanh thì bỏ qua */ }
+  }
+
+
+  // ============ ĐỔI TRẠNG THÁI MÓN ============
+  async function changeStatus(id, newStatus) {
+
+    try {
+      const res = await fetch('/api/kitchen/item/' + id + '/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, station_id: STATION_ID })
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message || 'Không đổi được trạng thái.');
+      }
+    } catch (e) {
+      alert('Mất kết nối tới máy chủ.');
+    }
+
+    loadItems();
+  }
+
+
+  // ============ KHỞI TẠO ============
+  loadItems();
+  setInterval(loadItems, 4000);      // 4 giây tự cập nhật một lần
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1209 @@
+
+<style>
+    .booking-section {
+    padding: 60px 20px;
+    text-align: center;
+}
+
+.guest-form {
+    margin: 25px auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+}
+
+.guest-form input {
+    width: 100px;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 17px;
+}
+
+.guest-form button {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    background: #222;
+    color: white;
+    cursor: pointer;
+}
+
+.floor-booking {
+    margin: 50px auto;
+}
+
+.floor-map {
+    position: relative;
+    width: 850px;
+    height: 650px;
+    max-width: 95%;
+    margin: auto;
+    background: #111827;
+    border: 4px solid #374151;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+
+/* =========================
+   BÀN CHUNG
+   ========================= */
+
+.table {
+    position: absolute;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    box-sizing: border-box;
+    background: #1f2937;
+    border: 2px solid #4b5563;
+    color: white;
+
+    font-size: 25px;
+    font-weight: bold;
+
+    cursor: not-allowed;
+
+    transition: 0.2s;
+}
+
+
+/* Bàn phù hợp */
+
+.table.suitable {
+    background: #166534;
+    border: 2px solid #22c55e;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(34,197,94,.3);
+}
+
+
+/* Bàn đã đặt */
+
+.table.booked {
+    background: #7f1d1d;
+    border: 2px solid #ef4444;
+    color: #fecaca;
+    cursor: not-allowed;
+}
+
+
+/* Bàn được khách chọn */
+
+.table.selected {
+    background: #ca8a04 !important;
+    color: white;
+    border: 3px solid #facc15;
+    transform: scale(1.05);
+}
+
+
+/* =========================
+   TẦNG 1
+   ========================= */
+
+.floor-1 .table {
+    width: 250px;
+    height: 70px;
+    left: 30px;
+}
+
+.floor-1 .table-A6 {
+    top: 40px;
+}
+
+.floor-1 .table-A5 {
+    top: 115px;
+}
+
+.floor-1 .table-A4 {
+    top: 190px;
+}
+
+.floor-1 .table-A3 {
+    top: 265px;
+}
+
+.floor-1 .table-A2 {
+    top: 340px;
+}
+
+.floor-1 .table-A1 {
+    top: 415px;
+}
+
+.floor-1 .table-A7 {
+    top: 415px;
+    left: 570px;
+    width: 230px;
+}
+
+
+/* Lối đi */
+
+.floor-1 .walkway {
+    position: absolute;
+    left: 350px;
+    top: 30px;
+    width: 180px;
+    height: 560px;
+    background: #27272a;
+    border-left: 3px solid #52525b;
+    border-right: 3px solid #52525b;
+    color: #d4d4d8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    font-size: 22px;
+    font-weight: bold;
+    z-index: 1;
+}
+
+.floor-1 .stairs {
+    position: absolute;
+    right: 0;
+    top: 30px;
+    width: 270px;
+    height: 80px;
+    background: #27272a;
+    color: white;
+    border: 3px solid #a1a1aa;
+    border-radius: 6px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    z-index: 3;
+}
+
+.floor-1 .cashier {
+    position: absolute;
+    right: 0;
+    top: 125px;
+    width: 270px;
+    height: 80px;
+    background: #3f3f46;
+    border: 3px solid #a1a1aa;
+    border-radius: 6px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    z-index: 3;
+}
+
+.floor-1 .table-A7 {
+    top: 225px;
+    left: auto;
+    right: 20px;
+    width: 230px;
+    height: 70px;
+    z-index: 5;
+}
+
+.floor-1 .kitchen {
+    position: absolute;
+    right: 0;
+    top: 320px;
+    width: 270px;
+    height: 280px;
+    box-sizing: border-box;
+    background: #27272a;
+    border: 3px solid #71717a;
+    border-radius: 6px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 20px;
+    z-index: 3;
+}
+
+.floor-1 .toilet {
+    position: absolute;
+    left: 0;
+    bottom: 20px;
+    width: 260px;
+    height: 100px;
+    background: #27272a;
+    border: 3px solid #71717a;
+    border-radius: 6px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    z-index: 3;
+}
+
+
+
+/* =========================
+   TẦNG 2
+   ========================= */
+
+.floor-2 .table {
+    width: 230px;
+    height: 65px;
+}
+
+
+/* VIP */
+
+.floor-2 .table-V1 {
+    top: 20px;
+    left: 30px;
+}
+
+.floor-2 .table-V2 {
+    top: 20px;
+    left: 590px;
+}
+
+
+/* B5 -> B1 */
+
+.floor-2 .table-B5 {
+    top: 110px;
+    left: 30px;
+}
+
+.floor-2 .table-B4 {
+    top: 180px;
+    left: 30px;
+}
+
+.floor-2 .table-B3 {
+    top: 250px;
+    left: 30px;
+}
+
+.floor-2 .table-B2 {
+    top: 320px;
+    left: 30px;
+}
+
+.floor-2 .table-B1 {
+    top: 390px;
+    left: 30px;
+}
+
+
+/* B9 B8 */
+
+.floor-2 .table-B9 {
+    top: 110px;
+    left: 590px;
+}
+
+.floor-2 .table-B8 {
+    top: 180px;
+    left: 590px;
+}
+
+
+/* B6 B7 */
+
+.floor-2 .table-B6 {
+    top: 320px;
+    left: 590px;
+}
+
+.floor-2 .table-B7 {
+    top: 390px;
+    left: 590px;
+}
+
+
+/* Cầu thang */
+
+.floor-2 .stairs {
+    position: absolute;
+
+    right: 0;
+    top: 250px;
+
+    width: 120px;
+    height: 65px;
+
+    background: #27272a;
+    color: white;
+
+    border: 3px solid #333;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-weight: bold;
+}
+
+
+/* Toilet */
+
+.floor-2 .toilet {
+    position: absolute;
+
+    left: 0;
+    bottom: 0;
+
+    width: 260px;
+    height: 100px;
+
+    background: #27272a;
+    color: white;
+
+    border: 3px solid #333;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-weight: bold;
+}
+
+
+/* =========================
+   THÔNG TIN BÀN CHỌN
+   ========================= */
+
+.selected-table {
+    margin: 25px auto;
+
+    max-width: 500px;
+
+    padding: 20px;
+
+    background: #f5f5f5;
+
+    border-radius: 10px;
+
+    font-size: 18px;
+}
+
+</style>
+
+    <!-- 3. ĐẶT BÀN -->
+    <!-- ========================================================= -->
+
+    <div id="view-reservation" class="hidden space-y-8">
+
+      <div class="text-center">
+        <h2 class="text-3xl font-bold text-white uppercase tracking-wider">
+          ĐẶT BÀN
+        </h2>
+
+        <p class="text-slate-400 mt-2">
+          Nhập số lượng khách, sau đó chọn bàn phù hợp ở tầng 1 hoặc tầng 2
+        </p>
+      </div>
+
+      <!-- Nhập số khách -->
+      <div class="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-8">
+        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">
+          Số lượng khách
+        </label>
+
+        <input
+          id="guestCount"
+          type="number"
+          min="1"
+          max="10"
+          value="2"
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500">
+
+        <button
+          type="button"
+          onclick="suggestTable()"
+          class="w-full mt-4 bg-red-600 hover:bg-red-500 py-3 rounded-xl font-bold text-white transition">
+
+          <i class="fa-solid fa-chair mr-2"></i>
+          XEM BÀN PHÙ HỢP
+        </button>
+
+        <div
+          id="tableResult"
+          class="mt-5 text-center text-sm text-slate-300">
+        </div>
+      </div>
+
+
+      <!-- ===================================================== -->
+      <!-- BẢN ĐỒ 2 TẦNG - CẢ HAI TẦNG HIỆN CÙNG LÚC -->
+      <!-- ===================================================== -->
+
+      <div id="reservationMaps" class="hidden">
+
+        <!-- Chú thích -->
+        <div class="flex flex-wrap justify-center gap-4 mb-8 text-sm">
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded bg-[#e8f4ff] border-2 border-slate-700"></span>
+            <span class="text-slate-300">Bàn thường</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded bg-[#72df88] border-2 border-green-700"></span>
+            <span class="text-slate-300">Có thể đặt</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded bg-[#ffb0b0] border-2 border-red-700"></span>
+            <span class="text-slate-300">Đã đặt</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded bg-[#ffd84d] border-2 border-yellow-600"></span>
+            <span class="text-slate-300">Đang chọn</span>
+          </div>
+        </div>
+
+
+        <!-- ================= TẦNG 1 ================= -->
+        <section class="floor-booking">
+          <h3 class="text-2xl font-bold text-white text-center mb-4">
+            <i class="fa-solid fa-building mr-2 text-red-500"></i>
+            TẦNG 1
+          </h3>
+
+          <p class="text-center text-slate-400 mb-5">
+            A1 – A7
+          </p>
+
+          <div class="floor-map floor-1">
+
+            <div class="walkway">
+              LỐI ĐI
+            </div>
+
+            <div class="stairs">
+              <i class="fa-solid fa-stairs mr-2 text-amber-400"></i>
+              CẦU THANG
+            </div>
+
+            <div class="cashier">
+              <i class="fa-solid fa-cash-register mr-2 text-amber-400"></i>
+              QUẦY THU NGÂN
+            </div>
+
+            <div class="kitchen">
+              <i class="fa-solid fa-fire-burner mr-2 text-red-400"></i>
+              BẾP
+            </div>
+
+            <div class="toilet">
+              <i class="fa-solid fa-restroom mr-2 text-sky-400"></i>
+              NHÀ VỆ SINH
+            </div>
+
+            {% for t in tables if t.floor == 1 %}
+            <div
+              class="table table-{{ t.id }} {% if t.status != 'AVAILABLE' %}booked{% endif %}"
+              data-id="{{ t.id }}"
+              data-capacity="{{ t.capacity }}"
+              data-min-capacity="{{ t.min_capacity|default(1) }}"
+              data-type="{{ t.type|default('NORMAL') }}"
+              data-status="{{ t.status }}"
+              onclick="selectTable('{{ t.id }}')">
+
+              <div class="text-center leading-tight">
+                <div>{{ t.id }}</div>
+                <div class="text-xs font-normal">
+                  {{ t.capacity }} chỗ
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+
+          </div>
+        </section>
+
+
+        <!-- ================= TẦNG 2 ================= -->
+        <section class="floor-booking">
+          <h3 class="text-2xl font-bold text-white text-center mb-4">
+            <i class="fa-solid fa-building mr-2 text-red-500"></i>
+            TẦNG 2
+          </h3>
+
+          <p class="text-center text-slate-400 mb-5">
+            B1 – B9 và khu VIP V1 – V2
+          </p>
+
+          <div class="floor-map floor-2">
+
+            <div class="stairs">
+              CẦU THANG
+            </div>
+
+            <div class="toilet">
+              NHÀ VỆ SINH
+            </div>
+
+            {% for t in tables if t.floor == 2 %}
+            <div
+              class="table table-{{ t.id }} {% if t.status != 'AVAILABLE' %}booked{% endif %}"
+              data-id="{{ t.id }}"
+              data-capacity="{{ t.capacity }}"
+              data-min-capacity="{{ t.min_capacity|default(1) }}"
+              data-type="{{ t.type|default('NORMAL') }}"
+              data-status="{{ t.status }}"
+              onclick="selectTable('{{ t.id }}')">
+
+              <div class="text-center leading-tight">
+                <div>
+                  {% if t.type == 'VIP' %}
+                    <i class="fa-solid fa-crown text-amber-500 mr-1"></i>
+                  {% endif %}
+                  {{ t.id }}
+                </div>
+
+                <div class="text-xs font-normal">
+                  {% if t.type == 'VIP' %}
+                    VIP • 8–10 khách
+                  {% else %}
+                    {{ t.capacity }} chỗ
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+
+          </div>
+        </section>
+
+
+        <!-- BÀN ĐANG CHỌN -->
+        <div id="selectedTable" class="selected-table hidden">
+
+          <div class="text-center">
+            <i class="fa-solid fa-chair text-3xl text-red-500 mb-3"></i>
+
+            <h3 class="text-xl font-bold text-slate-900">
+              BÀN ĐANG CHỌN
+            </h3>
+
+            <div id="selectedTableInfo" class="mt-2 text-slate-700"></div>
+
+            <button
+              type="button"
+              onclick="confirmTableBooking()"
+              class="mt-5 px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold transition">
+
+              <i class="fa-solid fa-check mr-2"></i>
+              XÁC NHẬN ĐẶT BÀN
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ========================================================= -->
+
+<script>
+      function goToContact() {
+      switchView('view-contact');
+
+      // Tô sáng đúng nút LIÊN HỆ tuỳ đang là khách hàng hay nhân viên
+      const isCustomer =
+        !document.getElementById('customerMenu').classList.contains('hidden');
+
+      setActiveMenu(isCustomer ? 'customer-nav-contact' : 'nav-contact');
+    }
+    // =========================================================
+    // GỢI Ý BÀN
+    // =========================================================
+
+    async function suggestTable() {
+
+      const guestInput = document.getElementById('guestCount');
+      const guests = parseInt(guestInput.value);
+
+      if (!guests || guests < 1) {
+        alert('Vui lòng nhập số lượng khách!');
+        guestInput.focus();
+        return;
+      }
+            // Trên 10 khách: không hiện sơ đồ, hướng dẫn sang mục Liên hệ
+      if (guests > 10) {
+
+        clearTableSelection();
+
+        document.getElementById('reservationMaps').classList.add('hidden');
+
+        document.getElementById('tableResult').innerHTML = `
+          <div class="bg-amber-950/40 border border-amber-800 rounded-xl p-4">
+
+            <p class="text-amber-400 font-bold">
+              <i class="fa-solid fa-circle-info mr-1"></i>
+              Đoàn trên 10 khách
+            </p>
+
+            <p class="text-slate-200 text-sm mt-2">
+              Vui lòng bấm vào mục
+              <b class="text-amber-400">LIÊN HỆ</b>
+              để chúng tôi có thể tư vấn tốt nhất cho bạn.
+            </p>
+
+            <button
+              type="button"
+              onclick="goToContact()"
+              class="mt-3 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition">
+              ĐẾN MỤC LIÊN HỆ
+            </button>
+
+          </div>
+        `;
+
+        return;
+      }
+
+      // Xóa trạng thái cũ
+      clearTableSelection();
+
+      const maps = document.getElementById('reservationMaps');
+      maps.classList.remove('hidden');
+
+      const result = document.getElementById('tableResult');
+
+      result.innerHTML = `
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+          <p class="text-slate-300">
+            <i class="fa-solid fa-spinner fa-spin mr-2"></i>
+            Đang tìm bàn phù hợp...
+          </p>
+        </div>
+      `;
+
+      try {
+
+        const response = await fetch('/api/suggest-tables', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            guests: guests
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('API error: ' + response.status);
+        }
+
+        const data = await response.json();
+
+        /*
+         * API có thể trả:
+         * data.tables
+         * hoặc data.available_tables
+         *
+         * Nếu API chỉ trả best_table_id thì phía dưới vẫn
+         * tự tính bàn phù hợp từ data-capacity của HTML.
+         */
+
+        let apiTables = data.tables || data.available_tables || [];
+
+        const apiSuitableIds = new Set();
+
+        if (Array.isArray(apiTables)) {
+          apiTables.forEach(function(table) {
+
+            if (typeof table === 'string') {
+              apiSuitableIds.add(table);
+            } else if (table && table.id) {
+              if (table.suitable === false) {
+                return;
+              }
+
+              if (table.status && table.status !== 'AVAILABLE') {
+                return;
+              }
+
+              apiSuitableIds.add(table.id);
+            }
+
+          });
+        }
+
+
+        // Lấy toàn bộ bàn trên 2 tầng
+        const tableElements = document.querySelectorAll('.floor-map .table');
+
+        let suitableCount = 0;
+        let suitableIds = [];
+
+        tableElements.forEach(function(tableEl) {
+
+          tableEl.classList.remove('suitable');
+          tableEl.classList.remove('selected');
+
+          const status = tableEl.dataset.status;
+          const type = tableEl.dataset.type || 'NORMAL';
+
+          const capacity =
+            parseInt(tableEl.dataset.capacity || '0');
+
+          const minCapacity =
+            parseInt(tableEl.dataset.minCapacity || '1');
+
+
+          // Không cho chọn bàn đã đặt
+          if (status !== 'AVAILABLE') {
+            return;
+          }
+
+
+          /*
+           * VIP:
+           * chỉ phù hợp từ 8 đến 10 khách.
+           *
+           * Bàn thường:
+           * sức chứa >= số khách.
+           */
+          let suitable = false;
+
+if (type === 'VIP') {
+
+    suitable = guests >= 9 && guests <= 10;
+
+} else {
+
+    if (guests === 1) {
+        suitable = capacity === 2;
+    }
+    else if (guests === 2) {
+        suitable = capacity === 2 || capacity === 4;
+    }
+    else if (guests === 3) {
+        suitable = capacity === 4;
+    }
+    else if (guests === 4) {
+        suitable = capacity === 4 || capacity === 6;
+    }
+    else if (guests === 5) {
+        suitable = capacity === 6;
+    }
+    else if (guests === 6) {
+        suitable = capacity === 6 || capacity === 8;
+    }
+    else if (guests === 7) {
+        suitable = capacity === 8;
+    }
+    else if (guests === 8) {
+        suitable = capacity === 8;
+    }
+
+}
+
+          /*
+           * Nếu API trả danh sách bàn phù hợp,
+           * ưu tiên kết quả API.
+           *
+           * Nếu API không trả danh sách thì dùng
+           * tính toán phía trình duyệt.
+           */
+          if (apiSuitableIds.size > 0) {
+            suitable = suitable && apiSuitableIds.has(tableEl.dataset.id);
+          }
+
+
+          if (suitable) {
+
+            tableEl.classList.add('suitable');
+
+            suitableCount++;
+            suitableIds.push(tableEl.dataset.id);
+          }
+
+        });
+
+
+        if (suitableCount > 0) {
+
+          let bestId = data.best_table_id;
+
+          // Nếu API không có bàn tốt nhất thì chọn bàn đầu tiên
+          if (!bestId || !suitableIds.includes(bestId)) {
+            bestId = suitableIds[0];
+          }
+
+          result.innerHTML = `
+            <div class="bg-emerald-950/40 border border-emerald-800 rounded-xl p-4">
+
+              <p class="text-emerald-400 font-bold">
+                <i class="fa-solid fa-check mr-1"></i>
+                Có ${suitableCount} bàn phù hợp
+              </p>
+
+              <p class="text-white mt-1">
+                Các bàn <b class="text-emerald-400">màu xanh</b> có thể đặt.
+              </p>
+
+              <p class="text-slate-400 text-xs mt-2">
+                Bạn hãy chọn một bàn màu xanh trên tầng 1 hoặc tầng 2.
+              </p>
+
+            </div>
+          `;
+
+        } else {
+
+          result.innerHTML = `
+            <div class="bg-red-950/40 border border-red-800 rounded-xl p-4">
+
+              <p class="text-red-400 font-bold">
+                <i class="fa-solid fa-circle-xmark mr-1"></i>
+                Không có bàn phù hợp
+              </p>
+
+              <p class="text-slate-400 text-xs mt-2">
+                Không tìm thấy bàn trống cho ${guests} khách.
+              </p>
+
+            </div>
+          `;
+        }
+
+
+      } catch (error) {
+
+        console.error(error);
+
+        /*
+         * Nếu API gặp lỗi, vẫn cho giao diện tự tìm
+         * bàn dựa trên sức chứa trong HTML.
+         */
+        const tableElements = document.querySelectorAll('.floor-map .table');
+
+        let suitableCount = 0;
+
+        tableElements.forEach(function(tableEl) {
+
+          tableEl.classList.remove('suitable');
+
+          if (tableEl.dataset.status !== 'AVAILABLE') {
+            return;
+          }
+
+          const type = tableEl.dataset.type || 'NORMAL';
+          const capacity =
+            parseInt(tableEl.dataset.capacity || '0');
+
+          const minCapacity =
+            parseInt(tableEl.dataset.minCapacity || '1');
+
+         let suitable = false;
+
+if (type === 'VIP') {
+
+    // 9 - 10 khách chỉ được bàn VIP
+    suitable = guests >= 9 && guests <= 10;
+
+} else {
+
+    // 1 khách → bàn 2 chỗ
+    if (guests === 1) {
+        suitable = capacity === 2;
+    }
+
+    // 2 khách → bàn 2 hoặc 4 chỗ
+    else if (guests === 2) {
+        suitable = capacity === 2 || capacity === 4;
+    }
+
+    // 3 khách → chỉ bàn 4 chỗ
+    else if (guests === 3) {
+        suitable = capacity === 4;
+    }
+
+    // 4 khách → bàn 4 hoặc 6 chỗ
+    else if (guests === 4) {
+        suitable = capacity === 4 || capacity === 6;
+    }
+
+    // 5 khách → chỉ bàn 6 chỗ
+    else if (guests === 5) {
+        suitable = capacity === 6;
+    }
+
+    // 6 khách → bàn 6 hoặc 8 chỗ
+    else if (guests === 6) {
+        suitable = capacity === 6 || capacity === 8;
+    }
+
+    // 7 khách → chỉ bàn 8 chỗ
+    else if (guests === 7) {
+        suitable = capacity === 8;
+    }
+
+    // 8 khách → chỉ bàn 8 chỗ
+    else if (guests === 8) {
+        suitable = capacity === 8;
+    }
+}
+
+          if (suitable) {
+            tableEl.classList.add('suitable');
+            suitableCount++;
+          }
+
+        });
+
+
+        if (suitableCount > 0) {
+
+          result.innerHTML = `
+            <div class="bg-amber-950/40 border border-amber-800 rounded-xl p-4">
+
+              <p class="text-amber-400 font-bold">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                Không kết nối được API
+              </p>
+
+              <p class="text-slate-300 text-sm mt-1">
+                Nhưng hệ thống vẫn đã hiển thị ${suitableCount}
+                bàn phù hợp dựa trên sức chứa.
+              </p>
+
+            </div>
+          `;
+
+        } else {
+
+          result.innerHTML = `
+            <div class="bg-red-950/40 border border-red-800 rounded-xl p-4">
+
+              <p class="text-red-400 font-bold">
+                Không có bàn phù hợp
+              </p>
+
+            </div>
+          `;
+
+        }
+
+      }
+
+    }
+
+
+    // =========================================================
+    // CHỌN BÀN
+    // =========================================================
+
+    let selectedTableId = null;
+
+
+    function selectTable(tableId) {
+
+      const tableEl =
+        document.querySelector(
+          `.floor-map .table[data-id="${tableId}"]`
+        );
+
+      if (!tableEl) {
+        return;
+      }
+
+
+      // Chỉ cho chọn bàn màu xanh
+      if (!tableEl.classList.contains('suitable')) {
+
+        if (tableEl.classList.contains('booked')) {
+          alert('Bàn này đã được đặt!');
+        } else {
+          alert('Bàn này không phù hợp với số lượng khách!');
+        }
+
+        return;
+      }
+
+
+      // Bỏ chọn bàn cũ
+      document.querySelectorAll('.floor-map .table.selected')
+        .forEach(function(el) {
+          el.classList.remove('selected');
+        });
+
+
+      // Chọn bàn mới
+      tableEl.classList.add('selected');
+
+      selectedTableId = tableId;
+
+
+      const guests =
+        parseInt(document.getElementById('guestCount').value || '0');
+
+      const capacity =
+        parseInt(tableEl.dataset.capacity || '0');
+
+      const type =
+        tableEl.dataset.type || 'NORMAL';
+
+      const floor =
+        tableEl.closest('.floor-1')
+          ? 'Tầng 1'
+          : 'Tầng 2';
+
+
+      const selectedBox =
+        document.getElementById('selectedTable');
+
+      const selectedInfo =
+        document.getElementById('selectedTableInfo');
+
+
+      selectedInfo.innerHTML = `
+        <p>
+          <b>Bàn:</b>
+          <span class="text-red-600 font-bold">
+            ${tableId}
+          </span>
+        </p>
+
+        <p>
+          <b>Tầng:</b> ${floor}
+        </p>
+
+        <p>
+          <b>Số khách:</b> ${guests}
+        </p>
+
+        <p>
+          <b>Sức chứa:</b> ${type === 'VIP' ? 'VIP 8–10 khách' : capacity + ' chỗ'}
+        </p>
+      `;
+
+
+      selectedBox.classList.remove('hidden');
+
+      selectedBox.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+
+    }
+
+
+    // =========================================================
+    // XÓA BÀN ĐANG CHỌN
+    // =========================================================
+
+    function clearTableSelection() {
+
+      selectedTableId = null;
+
+      document.querySelectorAll('.floor-map .table.selected')
+        .forEach(function(el) {
+          el.classList.remove('selected');
+        });
+
+      const selectedBox =
+        document.getElementById('selectedTable');
+
+      if (selectedBox) {
+        selectedBox.classList.add('hidden');
+      }
+
+    }
+
+
+    // =========================================================
+    // XÁC NHẬN ĐẶT BÀN
+    // =========================================================
+
+    function confirmTableBooking() {
+
+      if (!selectedTableId) {
+        alert('Vui lòng chọn một bàn trước!');
+        return;
+      }
+
+
+      const guests =
+        parseInt(document.getElementById('guestCount').value || '0');
+
+
+      const tableEl =
+        document.querySelector(
+          `.floor-map .table[data-id="${selectedTableId}"]`
+        );
+
+
+      if (!tableEl) {
+        alert('Không tìm thấy thông tin bàn!');
+        return;
+      }
+
+
+      const confirmBooking = confirm(
+        `Xác nhận đặt bàn ${selectedTableId} cho ${guests} khách?`
+      );
+
+
+      if (!confirmBooking) {
+        return;
+      }
+
+
+      /*
+       * Hiện tại file app.py bạn gửi chưa có API
+       * /api/book-table nên bước này chỉ cập nhật giao diện.
+       *
+       * Khi bạn thêm API lưu đặt bàn vào Flask,
+       * có thể thay phần này bằng fetch().
+       */
+
+      tableEl.classList.remove('suitable');
+      tableEl.classList.remove('selected');
+      tableEl.classList.add('booked');
+
+      tableEl.dataset.status = 'BOOKED';
+
+      tableEl.style.cursor = 'not-allowed';
+
+      const bookedId = selectedTableId;
+
+      selectedTableId = null;
+
+      document.getElementById('selectedTable')
+        .classList.add('hidden');
+
+
+      document.getElementById('tableResult').innerHTML = `
+        <div class="bg-emerald-950/40 border border-emerald-800 rounded-xl p-4">
+
+          <p class="text-emerald-400 font-bold">
+            <i class="fa-solid fa-circle-check mr-1"></i>
+            Đặt bàn thành công
+          </p>
+
+          <p class="text-white mt-1">
+            Bàn <b>${bookedId}</b> đã được chọn cho
+            <b>${guests}</b> khách.
+          </p>
+
+        </div>
+      `;
+
+    }
+
+
+    // =========================================================
+</script>

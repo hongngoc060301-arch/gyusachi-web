@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thu ngân - Gyu Sachi</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: #050505; }
+    .chip.active { background: #dc2626; border-color: #dc2626; color: #fff; }
+    .seg.active { background: #f59e0b; color: #0f172a; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+
+    /* In hoá đơn: chỉ in phần #receipt */
+    #receipt { display: none; }
+    @media print {
+      body * { visibility: hidden; }
+      #receipt, #receipt * { visibility: visible; }
+      #receipt { display: block; position: absolute; left: 0; top: 0; width: 80mm; padding: 4mm;
+                 color: #000; background: #fff; font-family: monospace; font-size: 12px; }
+      #receipt .r { display: flex; justify-content: space-between; gap: 8px; }
+      #receipt hr { border: 0; border-top: 1px dashed #000; margin: 6px 0; }
+    }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 h-screen overflow-hidden">
+
+<!-- ================= MÀN HÌNH NHẬP PIN ================= -->
+<div id="loginScreen" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4">
+  <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center">
+    <p class="text-red-500 font-black tracking-[.3em] text-xs">GYU SACHI</p>
+    <h1 class="text-2xl font-black mt-1">QUẦY THU NGÂN</h1>
+    <p class="text-slate-400 text-xs mt-1">Nhập mật khẩu quầy thu ngân</p>
+
+    <input id="pinInput" type="password" maxlength="30" autocomplete="off"
+      onkeydown="if(event.key==='Enter') login()"
+      class="mt-6 w-full text-center text-3xl tracking-[.5em] bg-slate-950 border border-slate-800 focus:border-amber-500 outline-none rounded-2xl py-3">
+    <p id="loginError" class="hidden text-sm text-red-400 mt-3"></p>
+
+    <button onclick="login()"
+      class="mt-5 w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black transition">
+      VÀO QUẦY THU NGÂN
+    </button>
+    <a href="/#staff-choice" class="block mt-4 text-xs text-slate-500 hover:text-white">← Quay lại</a>
+  </div>
+</div>
+
+
+<!-- ================= GIAO DIỆN CHÍNH ================= -->
+<div id="app" class="hidden h-screen flex flex-col">
+
+  <header class="shrink-0 flex items-center gap-4 px-5 py-3 bg-slate-900 border-b border-slate-800">
+    <div>
+      <p class="text-red-500 font-black tracking-[.3em] text-[10px]">GYU SACHI</p>
+      <h1 class="text-lg font-black leading-none">THU NGÂN</h1>
+    </div>
+
+    <nav class="flex gap-2 ml-4">
+      <button id="tabOpen" onclick="setView('open')"
+        class="chip active px-4 py-2 rounded-xl border border-slate-700 text-sm font-bold transition">
+        <i class="fa-solid fa-receipt mr-2"></i>Bàn đang dùng
+      </button>
+      <button id="tabHist" onclick="setView('hist')"
+        class="chip px-4 py-2 rounded-xl border border-slate-700 text-sm font-bold transition">
+        <i class="fa-solid fa-clock-rotate-left mr-2"></i>Hôm nay
+      </button>
+    </nav>
+
+    <div class="flex-1"></div>
+    <span id="who" class="text-sm text-slate-300"><i class="fa-solid fa-user mr-1 text-amber-400"></i></span>
+    <button onclick="logout()" class="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-800 transition">
+      <i class="fa-solid fa-right-from-bracket mr-2"></i>ĐĂNG XUẤT
+    </button>
+  </header>
+
+
+  <!-- ===== A. BÀN ĐANG DÙNG + HOÁ ĐƠN ===== -->
+  <main id="viewOpen" class="flex-1 min-h-0 flex flex-col lg:flex-row">
+
+    <section class="lg:w-[22rem] shrink-0 min-h-0 max-h-[35vh] lg:max-h-none overflow-y-auto p-4 border-b lg:border-b-0 lg:border-r border-slate-800">
+      <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Chọn bàn để tính tiền</h2>
+      <div id="orderList" class="space-y-2"></div>
+    </section>
+
+    <section class="flex-1 min-w-0 min-h-0 overflow-y-auto p-5">
+      <div id="billEmpty" class="h-full flex flex-col items-center justify-center text-slate-500">
+        <i class="fa-solid fa-cash-register text-5xl mb-4"></i>
+        <p class="text-sm">Chọn một bàn bên trái để xem hoá đơn</p>
+      </div>
+
+      <div id="billPanel" class="hidden max-w-3xl mx-auto space-y-5">
+
+        <div class="flex items-end justify-between">
+          <div>
+            <p class="text-[10px] text-slate-400 uppercase tracking-widest">Hoá đơn bàn</p>
+            <h2 id="bTable" class="text-4xl font-black text-red-500 leading-none"></h2>
+          </div>
+          <p id="bOpened" class="text-xs text-slate-400"></p>
+        </div>
+
+        <!-- số khách -->
+        <div class="flex flex-wrap items-center gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+          <span class="text-sm font-bold text-slate-300">Số khách tính tiền</span>
+          <div class="flex items-center gap-3">
+            <button onclick="changeGuests(-1)" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-xl font-black">−</button>
+            <span id="bGuests" class="text-3xl font-black w-12 text-center"></span>
+            <button onclick="changeGuests(1)" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-xl font-black">+</button>
+          </div>
+          <span class="text-[11px] text-slate-500">Chỉnh nếu có khách ra về sớm / thêm khách</span>
+        </div>
+
+        <!-- ưu đãi -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <span class="text-sm font-bold text-slate-300"><i class="fa-solid fa-gift mr-2 text-amber-400"></i>Ưu đãi "Đi 4 tính 3"</span>
+            <div class="flex rounded-xl overflow-hidden border border-slate-700 text-xs font-bold">
+              <button id="segAuto" onclick="setPromo('auto')" class="seg px-4 py-2">Tự động</button>
+              <button id="segOn"   onclick="setPromo('on')"   class="seg px-4 py-2">Áp dụng</button>
+              <button id="segOff"  onclick="setPromo('off')"  class="seg px-4 py-2">Không áp dụng</button>
+            </div>
+          </div>
+          <p id="bPromoNote" class="text-xs mt-2 text-slate-400"></p>
+        </div>
+
+        <!-- chi tiết tiền -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div id="bLines" class="space-y-2 text-sm"></div>
+          <hr class="border-slate-800 my-4">
+          <div class="space-y-1.5 text-sm">
+            <div class="flex justify-between text-slate-300"><span>Tạm tính</span><span id="bSub"></span></div>
+            <div id="bDiscRow" class="flex justify-between text-emerald-400"><span>Giảm giá</span><span id="bDisc"></span></div>
+            <div class="flex justify-between text-slate-300"><span id="bVatLabel">VAT</span><span id="bVat"></span></div>
+          </div>
+          <div class="flex justify-between items-end mt-4 pt-4 border-t border-slate-700">
+            <span class="font-bold text-slate-300">TỔNG THANH TOÁN</span>
+            <span id="bTotal" class="text-4xl font-black text-amber-400"></span>
+          </div>
+        </div>
+
+        <!-- thanh toán -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+          <div id="methodChips" class="grid grid-cols-3 gap-3"></div>
+
+          <div id="cashBox" class="hidden grid grid-cols-2 gap-3 items-end">
+            <div>
+              <label class="text-[11px] text-slate-400 uppercase tracking-widest">Khách đưa</label>
+              <input id="cashIn" type="text" inputmode="numeric" oninput="onCash()"
+                class="mt-1 w-full bg-slate-950 border border-slate-800 focus:border-amber-500 outline-none rounded-xl px-4 py-3 text-xl font-black text-right">
+            </div>
+            <div class="text-right">
+              <p class="text-[11px] text-slate-400 uppercase tracking-widest">Tiền thối</p>
+              <p id="cashChange" class="text-2xl font-black text-emerald-400 mt-1">0đ</p>
+            </div>
+            <div id="cashQuick" class="col-span-2 flex flex-wrap gap-2"></div>
+          </div>
+
+          <div id="payError" class="hidden text-sm text-red-400"></div>
+
+          <div class="flex gap-3">
+            <button onclick="printBill()"
+              class="px-5 py-4 rounded-2xl border border-slate-700 hover:bg-slate-800 font-bold text-sm transition">
+              <i class="fa-solid fa-print mr-2"></i>IN TẠM TÍNH
+            </button>
+            <button id="payBtn" onclick="pay(false)"
+              class="flex-1 py-4 rounded-2xl bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 font-black tracking-wider transition">
+              <i class="fa-solid fa-circle-check mr-2"></i>THANH TOÁN
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+
+  <!-- ===== B. LỊCH SỬ HÔM NAY ===== -->
+  <main id="viewHist" class="hidden flex-1 overflow-y-auto p-6">
+    <div class="max-w-3xl mx-auto space-y-5">
+      <div id="histSummary" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+            <tr><th class="text-left px-4 py-3">Giờ</th><th class="text-left px-4 py-3">Bàn</th>
+                <th class="text-right px-4 py-3">Khách</th><th class="text-left px-4 py-3">Hình thức</th>
+                <th class="text-left px-4 py-3">Thu ngân</th><th class="text-right px-4 py-3">Tổng</th></tr>
+          </thead>
+          <tbody id="histBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Bản in hoá đơn -->
+<div id="receipt"></div>
+
+<!-- Thông báo nhỏ -->
+<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl"></div>
+
+
+<script>
+  const METHODS = [
+    ['CASH',     'fa-money-bill-wave', 'Tiền mặt'],
+    ['CARD',     'fa-credit-card',     'Thẻ'],
+    ['TRANSFER', 'fa-qrcode',          'Chuyển khoản']
+  ];
+  const METHOD_NAME = { CASH: 'Tiền mặt', CARD: 'Thẻ', TRANSFER: 'Chuyển khoản' };
+
+  let CASHIER = null;      // {id, name, role}
+  let ORDERS = [];         // danh sách bàn đang dùng
+  let CUR = null;          // {orderId, guests, promo:'auto'|'on'|'off', method}
+  let BILL = null;         // hoá đơn đang xem
+  let billSeq = 0;         // chống kết quả cũ ghi đè kết quả mới
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function money(n) { return Number(n).toLocaleString('vi-VN') + 'đ'; }
+
+  async function api(url, body) {
+    try {
+      const res = await fetch(url, body === undefined ? {} : {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, message: 'Không kết nối được máy chủ.' };
+    }
+  }
+
+  function toast(msg, ok) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl ' +
+                  (ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white');
+    clearTimeout(t._h);
+    t._h = setTimeout(() => t.classList.add('hidden'), 3000);
+  }
+
+
+  // ============ ĐĂNG NHẬP ============
+  async function login() {
+    const pin = document.getElementById('pinInput').value.trim();
+    const err = document.getElementById('loginError');
+    err.classList.add('hidden');
+    if (!pin) return;
+
+    const r = await api('/api/cashier/login', { password: pin });
+    if (!r.success) {
+      err.textContent = r.message || 'Đăng nhập không được';
+      err.classList.remove('hidden');
+      return;
+    }
+    CASHIER = { name: 'Thu ngân', role: 'Quầy thu ngân' };
+    enterApp();
+  }
+
+  async function logout() {
+    await api('/api/cashier/logout', {});
+    location.href = '/#staff-choice';
+  }
+
+  function enterApp() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('who').innerHTML =
+      '<i class="fa-solid fa-user mr-1 text-amber-400"></i>' + esc(CASHIER.name);
+    loadOrders();
+  }
+
+  function setView(v) {
+    const open = v === 'open';
+    document.getElementById('viewOpen').classList.toggle('hidden', !open);
+    document.getElementById('viewHist').classList.toggle('hidden', open);
+    document.getElementById('tabOpen').classList.toggle('active', open);
+    document.getElementById('tabHist').classList.toggle('active', !open);
+    if (open) loadOrders(); else loadHistory();
+  }
+
+
+  // ============ DANH SÁCH BÀN ============
+  async function loadOrders() {
+    const r = await api('/api/cashier/orders');
+    ORDERS = r.orders || [];
+    renderOrders();
+  }
+
+  function renderOrders() {
+    const box = document.getElementById('orderList');
+    if (!ORDERS.length) {
+      box.innerHTML = '<p class="text-sm text-slate-500 text-center mt-8">Không có bàn nào đang dùng.</p>';
+      return;
+    }
+    box.innerHTML = ORDERS.map(o => `
+      <button data-id="${o.id}" onclick="selectOrder(Number(this.dataset.id))"
+        class="w-full text-left rounded-2xl border ${CUR && CUR.orderId === o.id ? 'border-red-500 bg-red-950/30' : 'border-slate-800 bg-slate-900 hover:border-slate-600'} p-4 transition">
+        <div class="flex items-center justify-between">
+          <span class="text-2xl font-black text-white">${esc(o.table_id)}</span>
+          <span class="text-sm font-black text-amber-400">${money(o.total)}</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-1">
+          <i class="fa-solid fa-users mr-1"></i>${o.guests} khách · ${esc(o.opened_at)}
+          ${o.package_name ? ' · ' + esc(o.package_name) : ' · Gọi lẻ'}
+        </div>
+        ${o.pending ? `<div class="text-[11px] text-amber-400 mt-1"><i class="fa-solid fa-hourglass-half mr-1"></i>${o.pending} món bếp chưa xong</div>` : ''}
+      </button>`).join('');
+  }
+
+
+  // ============ HOÁ ĐƠN ============
+  async function selectOrder(id) {
+    CUR = { orderId: id, guests: null, promo: 'auto', method: null };
+    document.getElementById('cashIn').value = '';
+    document.getElementById('payError').classList.add('hidden');
+    renderOrders();
+    await loadBill();
+  }
+
+  async function loadBill() {
+    if (!CUR) return;
+    const seq = ++billSeq;
+    let url = '/api/cashier/bill/' + CUR.orderId + '?promo=' + CUR.promo;
+    if (CUR.guests) url += '&guests=' + CUR.guests;
+
+    const r = await api(url);
+    if (seq !== billSeq) return;                       // đã có yêu cầu mới hơn
+    if (!r.success) { toast(r.message || 'Không tải được hoá đơn', false); return; }
+
+    BILL = r.bill;
+    if (BILL.status !== 'OPEN') { toast('Bàn này đã thanh toán.', false); CUR = null; BILL = null; loadOrders(); showEmpty(); return; }
+    CUR.guests = BILL.guests;
+    renderBill();
+  }
+
+  function showEmpty() {
+    document.getElementById('billPanel').classList.add('hidden');
+    document.getElementById('billEmpty').classList.remove('hidden');
+  }
+
+  function changeGuests(d) {
+    if (!CUR) return;
+    CUR.guests = Math.max(1, Math.min(60, (CUR.guests || 1) + d));
+    loadBill();
+  }
+
+  function setPromo(p) { CUR.promo = p; loadBill(); }
+
+  function setMethod(m) {
+    CUR.method = m;
+    renderMethods();
+  }
+
+  function renderBill() {
+    document.getElementById('billEmpty').classList.add('hidden');
+    document.getElementById('billPanel').classList.remove('hidden');
+
+    document.getElementById('bTable').textContent = BILL.table_id;
+    document.getElementById('bOpened').textContent = 'Mở lúc ' + BILL.opened_at;
+    document.getElementById('bGuests').textContent = BILL.guests;
+
+    ['Auto', 'On', 'Off'].forEach(k =>
+      document.getElementById('seg' + k).classList.toggle('active', CUR.promo === k.toLowerCase()));
+    document.getElementById('bPromoNote').innerHTML =
+      (BILL.promo_applied ? '<i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i>' : '<i class="fa-solid fa-circle-info mr-1"></i>') +
+      esc(BILL.promo_note);
+
+    const rows = [];
+    if (BILL.food_name)
+      rows.push(lineHtml(BILL.food_name + ' × ' + BILL.guests + ' khách', BILL.food_amount));
+    if (BILL.drink_name)
+      rows.push(lineHtml(BILL.drink_name + ' × ' + BILL.guests + ' khách', BILL.drink_amount));
+    BILL.lines.forEach(l =>
+      rows.push(lineHtml(l.name + ' × ' + l.qty, l.amount, money(l.unit_price) + ' / phần')));
+    document.getElementById('bLines').innerHTML = rows.length
+      ? rows.join('') : '<p class="text-slate-500 text-sm">Chưa có khoản nào.</p>';
+
+    document.getElementById('bSub').textContent = money(BILL.subtotal);
+    document.getElementById('bDiscRow').classList.toggle('hidden', !BILL.discount);
+    document.getElementById('bDisc').textContent = '− ' + money(BILL.discount);
+    document.getElementById('bVatLabel').textContent = 'VAT ' + Math.round(BILL.vat_rate * 100) + '%';
+    document.getElementById('bVat').textContent = money(BILL.vat);
+    document.getElementById('bTotal').textContent = money(BILL.total);
+
+    renderMethods();
+    onCash();
+  }
+
+  function lineHtml(name, amount, sub) {
+    return `<div class="flex justify-between gap-3">
+      <div class="min-w-0"><div class="text-slate-100">${esc(name)}</div>
+        ${sub ? `<div class="text-[11px] text-slate-500">${esc(sub)}</div>` : ''}</div>
+      <div class="font-bold whitespace-nowrap">${money(amount)}</div></div>`;
+  }
+
+  function renderMethods() {
+    document.getElementById('methodChips').innerHTML = METHODS.map(m => `
+      <button data-m="${m[0]}" onclick="setMethod(this.dataset.m)"
+        class="chip ${CUR.method === m[0] ? 'active' : ''} py-3 rounded-2xl border-2 border-slate-700 bg-slate-950 hover:border-red-500 font-bold text-sm transition">
+        <i class="fa-solid ${m[1]} mr-2"></i>${m[2]}
+      </button>`).join('');
+    document.getElementById('cashBox').classList.toggle('hidden', CUR.method !== 'CASH');
+    document.getElementById('payBtn').disabled = !CUR.method;
+    onCash();
+  }
+
+
+  // ============ TIỀN MẶT ============
+  function cashValue() {
+    return Number(document.getElementById('cashIn').value.replace(/\D/g, '')) || 0;
+  }
+
+  function onCash() {
+    if (!BILL) return;
+    const inp = document.getElementById('cashIn');
+    const v = cashValue();
+    inp.value = v ? v.toLocaleString('vi-VN') : '';
+
+    const change = v - BILL.total;
+    const el = document.getElementById('cashChange');
+    el.textContent = v ? (change >= 0 ? money(change) : 'Thiếu ' + money(-change)) : '0đ';
+    el.className = 'text-2xl font-black mt-1 ' + (change >= 0 ? 'text-emerald-400' : 'text-red-400');
+
+    // gợi ý mệnh giá: đúng tiền, làm tròn lên 50K / 100K / 500K
+    const t = BILL.total;
+    const sug = [...new Set([t, Math.ceil(t / 50000) * 50000, Math.ceil(t / 100000) * 100000, Math.ceil(t / 500000) * 500000])];
+    document.getElementById('cashQuick').innerHTML = sug.map(x => `
+      <button data-v="${x}" onclick="document.getElementById('cashIn').value=this.dataset.v; onCash()"
+        class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold">${money(x)}</button>`).join('');
+  }
+
+
+  // ============ THANH TOÁN ============
+  async function pay(force) {
+    if (!CUR || !CUR.method || !BILL) return;
+    const err = document.getElementById('payError');
+    err.classList.add('hidden');
+
+    if (CUR.method === 'CASH' && cashValue() && cashValue() < BILL.total) {
+      err.textContent = 'Khách đưa chưa đủ tiền.';
+      err.classList.remove('hidden');
+      return;
+    }
+
+    const r = await api('/api/cashier/pay/' + CUR.orderId, {
+      method: CUR.method, guests: CUR.guests,
+      promo: CUR.promo, force: !!force
+    });
+
+    if (r.pending) {
+      if (confirm(r.message)) return pay(true);
+      return;
+    }
+    if (!r.success) {
+      err.textContent = r.message || 'Không thanh toán được';
+      err.classList.remove('hidden');
+      return;
+    }
+
+    printBill(true);
+    toast('Đã thanh toán bàn ' + BILL.table_id + ' — ' + money(r.total), true);
+    CUR = null; BILL = null;
+    showEmpty();
+    loadOrders();
+  }
+
+
+  // ============ IN HOÁ ĐƠN ============
+  function printBill(paid) {
+    if (!BILL) return;
+    const row = (a, b) => `<div class="r"><span>${esc(a)}</span><span>${esc(b)}</span></div>`;
+    const html = [
+      '<div style="text-align:center"><b>GYU SACHI</b><br>NHÀ HÀNG BUFFET NHẬT - HÀN</div><hr>',
+      row('Bàn ' + BILL.table_id, BILL.guests + ' khách'),
+      row('Giờ vào', BILL.opened_at),
+      '<hr>'
+    ];
+    if (BILL.food_name)  html.push(row(BILL.food_name + ' x' + BILL.guests, money(BILL.food_amount)));
+    if (BILL.drink_name) html.push(row(BILL.drink_name + ' x' + BILL.guests, money(BILL.drink_amount)));
+    BILL.lines.forEach(l => html.push(row(l.name + ' x' + l.qty, money(l.amount))));
+    html.push('<hr>', row('Tạm tính', money(BILL.subtotal)));
+    if (BILL.discount) html.push(row('Giảm giá (đi 4 tính 3)', '-' + money(BILL.discount)));
+    html.push(row('VAT ' + Math.round(BILL.vat_rate * 100) + '%', money(BILL.vat)),
+              '<hr>', '<b>' + row('TỔNG', money(BILL.total)) + '</b>');
+    if (paid && CUR && CUR.method) html.push('<hr>', row('Thanh toán', METHOD_NAME[CUR.method]));
+    html.push('<hr><div style="text-align:center">' + (paid ? 'Cảm ơn quý khách!' : '(Hoá đơn tạm tính)') + '</div>');
+
+    document.getElementById('receipt').innerHTML = html.join('');
+    window.print();
+  }
+
+
+  // ============ LỊCH SỬ HÔM NAY ============
+  async function loadHistory() {
+    const r = await api('/api/cashier/history');
+    const card = (label, val, color) => `
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+        <p class="text-[10px] text-slate-400 uppercase tracking-widest">${label}</p>
+        <p class="text-xl font-black mt-1 ${color || 'text-white'}">${val}</p></div>`;
+
+    document.getElementById('histSummary').innerHTML =
+      card('Doanh thu hôm nay', money(r.revenue || 0), 'text-amber-400') +
+      card('Số hoá đơn', r.count || 0) +
+      card('Tiền mặt', money((r.by_method || {}).CASH || 0)) +
+      card('Thẻ + Chuyển khoản', money(((r.by_method || {}).CARD || 0) + ((r.by_method || {}).TRANSFER || 0)));
+
+    document.getElementById('histBody').innerHTML = (r.orders || []).map(o => `
+      <tr class="border-t border-slate-800">
+        <td class="px-4 py-3">${esc(o.paid_time)}</td>
+        <td class="px-4 py-3 font-bold">${esc(o.table_id)}</td>
+        <td class="px-4 py-3 text-right">${o.guests}</td>
+        <td class="px-4 py-3">${esc(METHOD_NAME[o.payment_method] || '')}</td>
+        <td class="px-4 py-3 text-slate-400">${esc(o.cashier || '')}</td>
+        <td class="px-4 py-3 text-right font-black text-amber-400">${money(o.total)}</td>
+      </tr>`).join('') ||
+      '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">Chưa có hoá đơn nào hôm nay.</td></tr>';
+  }
+
+
+  // ============ KHỞI TẠO ============
+  (async function init() {
+    const r = await api('/api/cashier/me');
+    if (r.logged_in) { CASHIER = { name: 'Thu ngân', role: 'Quầy thu ngân' }; enterApp(); return; }
+    document.getElementById('pinInput').focus();
+  })();
+
+  // tự làm mới danh sách bàn mỗi 8 giây
+  setInterval(function() {
+    if (CASHIER && !document.getElementById('viewOpen').classList.contains('hidden')) loadOrders();
+  }, 8000);
+</script>
+
+</body>
+</html>

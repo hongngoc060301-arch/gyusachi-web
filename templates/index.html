@@ -1,0 +1,1779 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>GYU SACHI - Nhà Hàng Nướng Nhật</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #050505;
+    }
+
+    /* Thanh menu */
+    .main-menu {
+      background: rgba(0, 0, 0, 0.92);
+      backdrop-filter: blur(8px);
+    }
+
+    .menu-item {
+      position: relative;
+      transition: 0.3s;
+    }
+
+    .menu-item::after {
+      content: "";
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: #dc2626;
+      transform: translateX(-50%);
+      transition: 0.3s;
+    }
+
+    .menu-item:hover {
+      color: #dc2626;
+    }
+
+    .menu-item:hover::after {
+      width: 100%;
+    }
+
+    /* Menu đang chọn */
+    .menu-active {
+      color: #dc2626 !important;
+    }
+
+    .menu-active::after {
+      width: 100%;
+    }
+
+    /* Hiệu ứng card */
+    .login-card {
+      transition: all 0.25s ease;
+    }
+
+    .login-card:hover {
+      transform: translateY(-6px);
+    }
+
+    .buffet-card.selected {
+      border-color: #dc2626;
+      background: #450a0a;
+    }
+  </style>
+</head>
+
+
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+<!-- MÀN HÌNH CHỌN KHÁCH HÀNG / NHÂN VIÊN -->
+<div id="entryScreen"
+     class="fixed inset-0 z-[9999] w-full bg-slate-950 overflow-y-auto">
+
+    <!-- BANNER: GIỮ NGUYÊN CHIỀU CAO TỰ NHIÊN -->
+    <div class="w-full">
+        <img
+            src="{{ url_for('static', filename='images/banner.png') }}"
+            alt="Banner Gyu Sachi"
+            class="w-full h-auto block">
+    </div>
+
+    <!-- TIÊU ĐỀ NẰM DƯỚI BANNER -->
+    <div class="w-full max-w-5xl mx-auto px-5 pt-8 pb-10">
+
+        <div class="text-center mb-10">
+
+            <p class="text-red-500 font-bold tracking-[0.4em] text-sm mb-3">
+                GYU SACHI
+            </p>
+
+            <h1 class="text-3xl md:text-5xl font-black text-white">
+                CHÀO MỪNG ĐẾN VỚI GYU SACHI
+            </h1>
+
+            <p class="text-slate-400 mt-4">
+                Vui lòng chọn khu vực bạn muốn truy cập
+            </p>
+
+        </div>
+
+        <!-- HAI Ô LỰA CHỌN -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-7">
+
+            <!-- KHÁCH HÀNG -->
+            <button
+                type="button"
+                onclick="enterCustomer()"
+                class="group min-h-[280px] rounded-3xl border border-red-900/70 bg-slate-900 p-8 md:p-12 text-center transition duration-300 hover:-translate-y-2 hover:border-red-500 hover:bg-slate-800">
+
+                <div class="mx-auto mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-red-950/60 text-red-500 group-hover:bg-red-600 group-hover:text-white">
+                    <i class="fa-solid fa-user text-5xl"></i>
+                </div>
+
+                <h2 class="text-2xl md:text-3xl font-black text-white group-hover:text-red-400">
+                    KHÁCH HÀNG
+                </h2>
+
+                <p class="mt-4 text-slate-400 leading-7">
+                    Xem thực đơn, khám phá buffet và đặt bàn tại nhà hàng.
+                </p>
+
+                <div class="mt-7 font-bold text-red-500">
+                    VÀO TRANG KHÁCH HÀNG →
+                </div>
+            </button>
+
+            <!-- NHÂN VIÊN -->
+            <button
+                type="button"
+                onclick="enterEmployee()"
+                class="group min-h-[280px] rounded-3xl border border-amber-900/70 bg-slate-900 p-8 md:p-12 text-center transition duration-300 hover:-translate-y-2 hover:border-amber-500 hover:bg-slate-800">
+
+                <div class="mx-auto mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-amber-950/60 text-amber-500 group-hover:bg-amber-500 group-hover:text-white">
+                    <i class="fa-solid fa-users-gear text-5xl"></i>
+                </div>
+
+                <h2 class="text-2xl md:text-3xl font-black text-white group-hover:text-amber-400">
+                    NHÂN VIÊN
+                </h2>
+
+                <p class="mt-4 text-slate-400 leading-7">
+                    Truy cập khu vực dành cho quản lí, thu ngân và nhân viên.
+                </p>
+
+                <div class="mt-7 font-bold text-amber-500">
+                    VÀO KHU VỰC NHÂN VIÊN →
+                </div>
+            </button>
+
+        </div>
+    </div>
+</div>
+
+
+  <!-- ========================================================= -->
+  <!-- BANNER + MENU -->
+  <!-- ========================================================= -->
+
+  <header class="relative w-full bg-black shadow-2xl">
+
+    <!-- Banner -->
+    <div class="w-full">
+      <img
+        src="{{ url_for('static', filename='images/banner.png') }}"
+        alt="Banner Gyu Sachi"
+        class="w-full h-auto block object-cover">
+    </div>
+
+    <!-- NÚT VỀ TRANG CHỌN KHU VỰC -->
+    <button
+      id="backToEntry"
+      type="button"
+      onclick="backToEntry()"
+      class="hidden fixed top-4 left-4 z-[100] px-4 py-2 rounded-xl bg-black/70 backdrop-blur border border-slate-600 text-white text-xs md:text-sm font-bold hover:bg-red-600 hover:border-red-500 transition">
+      <i class="fa-solid fa-arrow-left mr-2"></i>QUAY LẠI
+    </button>
+
+    <!-- THANH MENU DÀNH RIÊNG CHO KHÁCH HÀNG -->
+    <nav id="customerMenu" class="main-menu absolute bottom-0 left-0 w-full z-20 hidden">
+      <div class="max-w-5xl mx-auto">
+        <div class="flex flex-wrap items-center justify-center gap-6 md:gap-14 py-5">
+          <button id="customer-nav-program"
+            onclick="switchView('view-home'); setActiveMenu('customer-nav-program')"
+            class="menu-item menu-active text-xs md:text-sm font-bold tracking-widest uppercase text-white">
+            CHƯƠNG TRÌNH
+          </button>
+          <button id="customer-nav-menu"
+            onclick="switchView('view-menu'); setActiveMenu('customer-nav-menu')"
+            class="menu-item text-xs md:text-sm font-bold tracking-widest uppercase text-white">
+            MENU
+          </button>
+          <button id="customer-nav-reservation"
+            onclick="switchView('view-reservation'); setActiveMenu('customer-nav-reservation')"
+            class="menu-item text-xs md:text-sm font-bold tracking-widest uppercase text-white">
+            ĐẶT BÀN
+          </button>
+          <button id="customer-nav-contact"
+            onclick="switchView('view-contact'); setActiveMenu('customer-nav-contact')"
+            class="menu-item text-xs md:text-sm font-bold tracking-widest uppercase text-white">
+            LIÊN HỆ
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- THANH MENU DÀNH RIÊNG CHO NHÂN VIÊN -->
+    <nav id="employeeMenu" class="main-menu absolute bottom-0 left-0 w-full z-20 hidden">
+
+      <div class="max-w-5xl mx-auto">
+
+        <div class="flex items-center justify-center gap-10 md:gap-14 py-5">
+
+          <!-- TRANG CHỦ -->
+          <button
+            id="nav-home"
+            onclick="switchView('view-home'); setActiveMenu('nav-home')"
+            class="menu-item menu-active text-xs md:text-sm font-bold tracking-widest uppercase text-white">
+            TRANG CHỦ
+          </button>
+
+
+          <!-- MENU -->
+          <button
+            id="nav-menu"
+            onclick="switchView('view-menu'); setActiveMenu('nav-menu')"
+            class="menu-item text-xs md:text-sm font-bold tracking-widest uppercase text-white">
+            MENU
+          </button>
+
+
+          <!-- ĐẶT BÀN -->
+          <button
+            id="nav-reservation"
+            onclick="switchView('view-reservation'); setActiveMenu('nav-reservation')"
+            class="menu-item text-xs md:text-sm font-bold tracking-widest uppercase text-white">
+            ĐẶT BÀN
+          </button>
+
+
+          <!-- ĐĂNG NHẬP -->
+          <button
+            id="nav-login"
+            onclick="switchView('view-login'); setActiveMenu('nav-login')"
+            class="menu-item text-xs md:text-sm font-bold tracking-widest uppercase text-white">
+            ĐĂNG NHẬP
+          </button>
+
+
+          <!-- LIÊN HỆ -->
+          <button
+            id="nav-contact"
+            onclick="switchView('view-contact'); setActiveMenu('nav-contact')"
+            class="menu-item text-xs md:text-sm font-bold tracking-widest uppercase text-white">
+            LIÊN HỆ
+          </button>
+
+        </div>
+
+      </div>
+
+    </nav>
+
+  </header>
+
+
+
+  <!-- ========================================================= -->
+  <!-- MAIN -->
+  <!-- ========================================================= -->
+
+  <main class="max-w-6xl w-full mx-auto px-4 py-10">
+
+
+    <!-- ======================================================= -->
+    <!-- 1. TRANG CHỦ -->
+    <!-- ======================================================= -->
+
+    <div id="view-home" class="space-y-6">
+
+
+      <!-- Tiêu đề -->
+      <div class="text-center mb-8">
+
+        <h2 class="text-xl font-bold text-slate-300 uppercase tracking-widest">
+          CHÀO MỪNG ĐẾN VỚI GYU SACHI
+        </h2>
+
+        <p class="text-slate-500 text-sm mt-2">
+          Nhà hàng lẩu nướng Nhật Bản
+        </p>
+
+      </div>
+
+      <!-- ===================================================== -->
+      <!-- CHƯƠNG TRÌNH ƯU ĐÃI -->
+      <!-- ===================================================== -->
+
+      <section class="space-y-6">
+
+        <!-- Tiêu đề mục -->
+        <div class="text-center">
+          <p class="text-red-500 text-xs font-bold tracking-[0.4em] uppercase">
+            PROMOTIONS
+          </p>
+          <h3 class="text-2xl md:text-3xl font-extrabold text-white uppercase tracking-wider mt-2">
+            MENU &amp; <span class="text-red-500">ƯU ĐÃI MỚI</span>
+          </h3>
+        </div>
+
+        <!-- 3 thẻ chương trình -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          <!-- Thẻ 1: Buffet trưa -->
+          <div class="group relative overflow-hidden rounded-3xl border border-red-950/70 bg-gradient-to-b from-slate-900 to-slate-950 p-7 shadow-xl transition duration-300 hover:-translate-y-2 hover:border-red-500">
+
+            <div class="absolute -right-4 -top-6 text-8xl font-black text-red-500 opacity-5 select-none pointer-events-none">1</div>
+
+            <span class="inline-block rounded-full border border-red-800/40 bg-red-950/50 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-red-400">
+              Buổi trưa
+            </span>
+
+            <div class="mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-950/60 text-2xl text-red-500 transition group-hover:bg-red-600 group-hover:text-white">
+              <i class="fa-solid fa-bowl-food"></i>
+            </div>
+
+            <h4 class="mt-4 text-xl font-black text-white group-hover:text-red-400 transition">
+              Buffet trưa
+            </h4>
+
+            <p class="mt-3 text-4xl font-black text-red-500">
+              219K
+            </p>
+
+            <p class="mt-2 text-sm leading-relaxed text-slate-400">
+              Thưởng thức buffet vào buổi trưa với mức giá tiết kiệm.
+            </p>
+
+            <div class="mt-5 flex items-center gap-2 border-t border-slate-800 pt-4 text-xs text-amber-400 font-semibold">
+              <i class="fa-regular fa-calendar"></i>
+              Các buổi trưa: Thứ 2 – Chủ nhật
+            </div>
+          </div>
+
+          <!-- Thẻ 2: Buffet CocaCola -->
+          <div class="group relative overflow-hidden rounded-3xl border border-red-950/70 bg-gradient-to-b from-slate-900 to-slate-950 p-7 shadow-xl transition duration-300 hover:-translate-y-2 hover:border-amber-500">
+
+            <div class="absolute -right-4 -top-6 text-8xl font-black text-amber-500 opacity-5 select-none pointer-events-none">2</div>
+
+            <span class="inline-block rounded-full border border-amber-800/40 bg-amber-950/50 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-amber-400">
+              Buổi trưa
+            </span>
+
+            <div class="mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-amber-950/60 text-2xl text-amber-500 transition group-hover:bg-amber-500 group-hover:text-white">
+              <i class="fa-solid fa-martini-glass-citrus"></i>
+            </div>
+
+            <h4 class="mt-4 text-xl font-black text-white group-hover:text-amber-400 transition">
+              Buffet Coca
+            </h4>
+
+            <p class="mt-3 text-4xl font-black text-amber-400">
+              15K
+            </p>
+
+            <p class="mt-2 text-sm leading-relaxed text-slate-400">
+              Uống Cocacola không giới hạn trong bữa trưa chỉ với 15K.
+            </p>
+
+            <div class="mt-5 flex items-center gap-2 border-t border-slate-800 pt-4 text-xs text-amber-400 font-semibold">
+              <i class="fa-solid fa-glass-water"></i>
+              Các buổi trưa: Thứ 2 – Chủ nhật
+            </div>
+          </div>
+
+          <!-- Thẻ 3: Đi 4 tính 3 -->
+          <div class="group relative overflow-hidden rounded-3xl border border-red-950/70 bg-gradient-to-b from-slate-900 to-slate-950 p-7 shadow-xl transition duration-300 hover:-translate-y-2 hover:border-emerald-500">
+
+            <div class="absolute -right-4 -top-6 text-8xl font-black text-emerald-500 opacity-5 select-none pointer-events-none">3</div>
+
+            <span class="inline-block rounded-full border border-emerald-800/40 bg-emerald-950/50 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-emerald-400">
+              Nhóm bạn
+            </span>
+
+            <div class="mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-950/60 text-2xl text-emerald-500 transition group-hover:bg-emerald-500 group-hover:text-white">
+              <i class="fa-solid fa-people-group"></i>
+            </div>
+
+            <h4 class="mt-4 text-xl font-black text-white group-hover:text-emerald-400 transition">
+              Đi 4 tính 3
+            </h4>
+
+            <p class="mt-3 text-sm font-bold text-emerald-400">
+              Áp dụng với menu 349K – 389K – 469K
+            </p>
+
+            <p class="mt-2 text-sm leading-relaxed text-slate-400">
+              Đi nhóm 4 người, chỉ tính tiền 3 người.
+            </p>
+
+            <div class="mt-5 border-t border-slate-800 pt-4 text-xs text-amber-400 font-semibold space-y-1">
+              <div><i class="fa-regular fa-calendar mr-2"></i>Buổi tối: Thứ 2 – Thứ 5</div>
+              <div><i class="fa-regular fa-clock mr-2"></i>Buổi trưa: tất cả các ngày</div>
+            </div>
+          </div>
+
+        </div>
+        <!-- Lưu ý ngày lễ -->
+        <p class="text-center text-sm text-slate-400">
+          <i class="fa-solid fa-circle-info text-amber-400 mr-1"></i>
+          Các chương trình ưu đãi
+          <b class="text-amber-400">không áp dụng vào các ngày lễ</b>.
+        </p>
+      </section>
+
+            <!-- ===================================================== -->
+      <!-- QUY ĐỊNH BUFFET -->
+      <!-- ===================================================== -->
+
+      <section class="space-y-6 pt-4">
+
+        <!-- Tiêu đề mục -->
+        <div class="text-center">
+          <p class="text-red-500 text-xs font-bold tracking-[0.4em] uppercase">
+            RULES
+          </p>
+          <h3 class="text-2xl md:text-3xl font-extrabold text-white uppercase tracking-wider mt-2">
+            QUY ĐỊNH KHI DÙNG <span class="text-red-500">BUFFET</span>
+          </h3>
+          <p class="text-slate-400 text-sm mt-2">
+            Những quy định chung khi khách hàng dùng buffet nhà
+            <span class="text-amber-400 font-bold">GYU SACHI</span>
+          </p>
+
+          <div class="flex items-center justify-center gap-2 pt-3">
+            <div class="h-[1px] w-12 bg-gradient-to-r from-transparent to-red-600"></div>
+            <div class="w-2 h-2 rotate-45 border border-red-500 bg-red-950"></div>
+            <div class="h-[1px] w-12 bg-gradient-to-l from-transparent to-red-600"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+          <!-- Giá vé trẻ em -->
+          <div class="lg:col-span-2 relative overflow-hidden rounded-3xl border border-amber-900/50 bg-gradient-to-b from-slate-900 to-slate-950 p-7 shadow-xl">
+
+            <div class="absolute -right-6 -bottom-8 select-none pointer-events-none opacity-5 text-amber-500 text-9xl">
+              <i class="fa-solid fa-child"></i>
+            </div>
+
+            <div class="relative z-10">
+              <div class="flex items-center gap-3">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-950/60 text-xl text-amber-400">
+                  <i class="fa-solid fa-child-reaching"></i>
+                </div>
+                <h4 class="text-lg font-black text-white uppercase tracking-wide">
+                  Giá vé trẻ em
+                </h4>
+              </div>
+
+              <div class="mt-6 space-y-3">
+
+                <div class="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                  <span class="text-sm text-slate-300">Dưới 1m</span>
+                  <span class="rounded-full bg-emerald-950/60 border border-emerald-800/50 px-3 py-1 text-xs font-bold text-emerald-400">
+                    Miễn phí
+                  </span>
+                </div>
+
+                <div class="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                  <span class="text-sm text-slate-300">Từ 1m – 1m30</span>
+                  <span class="rounded-full bg-amber-950/60 border border-amber-800/50 px-3 py-1 text-xs font-bold text-amber-400">
+                    Giảm 50% / vé
+                  </span>
+                </div>
+
+                <div class="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                  <span class="text-sm text-slate-300">Trên 1m30</span>
+                  <span class="rounded-full bg-red-950/60 border border-red-800/50 px-3 py-1 text-xs font-bold text-red-400">
+                    Giá người lớn
+                  </span>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Quy định chung -->
+          <div class="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            <div class="rounded-3xl border border-red-950/70 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-xl transition duration-300 hover:-translate-y-1 hover:border-red-500">
+              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-950/60 text-xl text-red-500">
+                <i class="fa-solid fa-utensils"></i>
+              </div>
+              <h4 class="mt-4 font-black text-white">Không lãng phí thức ăn</h4>
+              <p class="mt-2 text-sm leading-relaxed text-slate-400">
+                Quý khách vui lòng sử dụng hết phần đã gọi. Nếu không sử dụng hết,
+                Gyu Sachi xin phép thu phí
+                <b class="text-amber-400">200.000đ / 100gram</b> thức ăn thừa.
+              </p>
+            </div>
+
+            <div class="rounded-3xl border border-red-950/70 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-xl transition duration-300 hover:-translate-y-1 hover:border-red-500">
+              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-950/60 text-xl text-red-500">
+                <i class="fa-solid fa-bag-shopping"></i>
+              </div>
+              <h4 class="mt-4 font-black text-white">Không mang thức ăn ra khỏi nhà hàng</h4>
+              <p class="mt-2 text-sm leading-relaxed text-slate-400">
+                Gyu Sachi xin phép thu phí
+                <b class="text-amber-400">200.000đ / 100gram</b>
+                nếu mang thức ăn ra khỏi nhà hàng.
+              </p>
+            </div>
+
+            <div class="rounded-3xl border border-red-950/70 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-xl transition duration-300 hover:-translate-y-1 hover:border-red-500">
+              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-950/60 text-xl text-red-500">
+                <i class="fa-solid fa-clock"></i>
+              </div>
+              <h4 class="mt-4 font-black text-white">Thời gian gọi món</h4>
+              <p class="mt-2 text-sm leading-relaxed text-slate-400">
+                Quý khách có
+                <b class="text-amber-400">120 phút</b>
+                gọi món, bắt đầu từ món đầu tiên.
+              </p>
+            </div>
+
+            <div class="rounded-3xl border border-red-950/70 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-xl transition duration-300 hover:-translate-y-1 hover:border-red-500">
+              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-950/60 text-xl text-red-500">
+                <i class="fa-solid fa-receipt"></i>
+              </div>
+              <h4 class="mt-4 font-black text-white">Giá buffet</h4>
+              <p class="mt-2 text-sm leading-relaxed text-slate-400">
+                Giá buffet tính theo đầu người và chưa bao gồm thuế
+                <b class="text-amber-400">VAT 8%</b>.
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- GIỚI THIỆU THƯƠNG HIỆU - GIỮ NGUYÊN CODE CŨ -->
+      <!-- ===================================================== -->
+
+      <section
+        class="relative overflow-hidden rounded-3xl bg-gradient-to-b from-slate-900 via-stone-950 to-slate-950 border border-red-950/70 p-8 md:p-10 shadow-2xl">
+
+        <!-- Chữ Nhật trang trí -->
+        <div
+          class="absolute -right-6 -bottom-8 select-none pointer-events-none opacity-5 text-red-500 font-serif text-9xl font-black">
+
+          幸
+
+        </div>
+
+
+        <div class="relative z-10 max-w-4xl mx-auto text-center space-y-4">
+
+
+          <!-- Nhãn -->
+          <div
+            class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/50 border border-red-800/40 text-red-400 text-xs font-bold tracking-widest uppercase">
+
+            <span
+              class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse">
+            </span>
+
+            CÂU CHUYỆN THƯƠNG HIỆU • 牛幸 STORY
+
+          </div>
+
+
+          <!-- Tiêu đề -->
+          <h3 class="text-2xl md:text-3xl font-extrabold text-white tracking-wide">
+
+            HƯƠNG VỊ CỦA
+            <span class="text-red-500">
+              HẠNH PHÚC
+            </span>
+            TRÊN TỪNG NGỌN LỬA HỒNG
+
+          </h3>
+
+
+          <!-- Đường trang trí -->
+          <div class="flex items-center justify-center gap-2 py-1">
+
+            <div
+              class="h-[1px] w-12 bg-gradient-to-r from-transparent to-red-600">
+            </div>
+
+            <div
+              class="w-2 h-2 rotate-45 border border-red-500 bg-red-950">
+            </div>
+
+            <div
+              class="h-[1px] w-12 bg-gradient-to-l from-transparent to-red-600">
+            </div>
+
+          </div>
+
+
+          <!-- Nội dung giới thiệu -->
+          <p
+            class="text-slate-300/90 text-sm md:text-base leading-relaxed md:leading-loose text-justify md:text-center font-normal">
+
+            Bắt nguồn từ ý niệm về sự viên mãn trong văn hóa ẩm thực Nhật Bản,
+
+            <strong class="text-amber-400 font-semibold">
+              Gyu Sachi
+            </strong>
+
+            — kết tinh từ
+
+            <span class="text-red-400 font-medium">
+              “Gyu”
+            </span>
+
+            (thịt bò) và
+
+            <span class="text-red-400 font-medium">
+              “Sachi”
+            </span>
+
+            (hạnh phúc) — được sáng lập với sứ mệnh mang đến trải nghiệm lẩu
+            nướng Yakiniku đích thực giữa lòng Đà Nẵng.
+
+            Khởi đầu từ niềm đam mê lưu giữ trọn vẹn vị ngọt nguyên bản của
+            từng lát thịt bò thượng hạng cùng hải sản tươi ngon trên bếp than
+            hồng, Gyu Sachi đã không ngừng phát triển để trở thành điểm hẹn
+            quen thuộc của những tín đồ ẩm thực xứ Phù Tang.
+
+            Không chỉ dừng lại ở bàn tiệc nướng thơm lừng chuẩn vị sốt Tare
+            hay những set sushi, sashimi thanh khiết, thương hiệu còn tỉ mỉ
+            kiến tạo một không gian ấm cúng mang đậm dấu ấn Nhật, nơi mỗi bữa
+            ăn cùng gia đình và bè bạn đều hóa thành những khoảnh khắc sẻ chia
+            ngập tràn niềm vui và trọn vẹn hương vị.
+
+          </p>
+
+
+          <!-- 3 giá trị -->
+          <div
+            class="pt-4 grid grid-cols-3 gap-2 border-t border-slate-800/80 text-center">
+
+
+            <div>
+
+              <span
+                class="block text-amber-400 font-bold text-base md:text-lg">
+                100%
+              </span>
+
+              <span
+                class="text-[11px] text-slate-400 uppercase tracking-wider">
+                Thịt Bò Thượng Hạng
+              </span>
+
+            </div>
+
+
+            <div class="border-x border-slate-800">
+
+              <span
+                class="block text-red-400 font-bold text-base md:text-lg">
+                Tare Sauce
+              </span>
+
+              <span
+                class="text-[11px] text-slate-400 uppercase tracking-wider">
+                Sốt Ướp Chuẩn Vị
+              </span>
+
+            </div>
+
+
+            <div>
+
+              <span
+                class="block text-emerald-400 font-bold text-base md:text-lg">
+                Omotenashi
+              </span>
+
+              <span
+                class="text-[11px] text-slate-400 uppercase tracking-wider">
+                Tận Tâm Phục Vụ
+              </span>
+
+            </div>
+
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </div>
+
+
+
+    <!-- ========================================================= -->
+    <!-- 2. MENU - GỘP CHUNG TRONG INDEX -->
+    <!-- ========================================================= -->
+
+        <!-- ========================================================= -->
+    <!-- 2. MENU -->
+    <!-- ========================================================= -->
+
+    <div id="view-menu" class="hidden space-y-8">
+
+      <div class="text-center">
+        <p class="text-red-500 text-sm font-bold tracking-[0.4em] uppercase">OUR MENU</p>
+        <h2 class="text-4xl font-extrabold text-white uppercase tracking-wider mt-2">THỰC ĐƠN</h2>
+        <p class="text-slate-400 mt-2">Khám phá những món ăn đặc trưng của Gyu Sachi</p>
+      </div>
+
+      <!-- 3 lựa chọn chính -->
+      <div id="menuTypes" class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+
+        <button type="button" onclick="openMenuSection('buffetSection')"
+          class="bg-slate-900 border border-red-950 rounded-3xl p-8 text-center hover:border-red-500 hover:-translate-y-1 transition shadow-xl">
+          <i class="fa-solid fa-fire-burner text-5xl text-red-500 mb-5"></i>
+          <h3 class="text-2xl font-black text-white">BUFFET</h3>
+          <p class="text-slate-400 mt-3 text-sm">Nhiều mức giá để lựa chọn</p>
+          <span class="inline-block mt-5 px-6 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold">XEM MENU</span>
+        </button>
+
+        <button type="button" onclick="openMenuSection('alacarteSection'); loadCategoryImages('alacarte','alacarteList')"
+          class="bg-slate-900 border border-amber-900/70 rounded-3xl p-8 text-center hover:border-amber-500 hover:-translate-y-1 transition shadow-xl">
+          <i class="fa-solid fa-utensils text-5xl text-amber-500 mb-5"></i>
+          <h3 class="text-2xl font-black text-white">ALACARTE</h3>
+          <p class="text-slate-400 mt-3 text-sm">Gọi món theo sở thích</p>
+          <span class="inline-block mt-5 px-6 py-2.5 rounded-xl bg-amber-500 text-slate-950 text-sm font-bold">XEM MENU</span>
+        </button>
+
+        <button type="button" onclick="openMenuSection('drinkSection'); loadCategoryImages('drink','drinkList')"
+          class="bg-slate-900 border border-sky-900/70 rounded-3xl p-8 text-center hover:border-sky-500 hover:-translate-y-1 transition shadow-xl">
+          <i class="fa-solid fa-martini-glass-citrus text-5xl text-sky-400 mb-5"></i>
+          <h3 class="text-2xl font-black text-white">NƯỚC</h3>
+          <p class="text-slate-400 mt-3 text-sm">Đồ uống & tráng miệng</p>
+          <span class="inline-block mt-5 px-6 py-2.5 rounded-xl bg-sky-500 text-slate-950 text-sm font-bold">XEM MENU</span>
+        </button>
+
+      </div>
+
+      <!-- ===== BUFFET: 6 mức giá ===== -->
+      <section id="buffetSection" class="menu-section hidden max-w-5xl mx-auto">
+
+        <button type="button" onclick="backToMenuTypes()"
+          class="mb-7 px-5 py-2 rounded-xl border border-red-700 text-slate-200 hover:bg-red-700 transition">
+          <i class="fa-solid fa-arrow-left mr-2"></i>QUAY LẠI
+        </button>
+
+        <div class="text-center mb-8">
+          <h3 class="text-3xl font-bold text-white">MENU BUFFET</h3>
+          <p class="text-slate-400 mt-2">Chọn mức giá để xem menu chi tiết</p>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <button type="button" onclick="showBuffetMenu(199000,this)" class="buffet-card bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500 transition text-center">
+            <span class="text-slate-300 font-bold">BUFFET</span>
+            <span class="block text-2xl text-red-500 font-black mt-2">199.000đ</span>
+          </button>
+          <button type="button" onclick="showBuffetMenu(269000,this)" class="buffet-card bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500 transition text-center">
+            <span class="text-slate-300 font-bold">BUFFET</span>
+            <span class="block text-2xl text-red-500 font-black mt-2">269.000đ</span>
+          </button>
+          <button type="button" onclick="showBuffetMenu(299000,this)" class="buffet-card bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500 transition text-center">
+            <span class="text-slate-300 font-bold">BUFFET</span>
+            <span class="block text-2xl text-red-500 font-black mt-2">299.000đ</span>
+          </button>
+          <button type="button" onclick="showBuffetMenu(349000,this)" class="buffet-card bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500 transition text-center">
+            <span class="text-slate-300 font-bold">BUFFET</span>
+            <span class="block text-2xl text-red-500 font-black mt-2">349.000đ</span>
+          </button>
+          <button type="button" onclick="showBuffetMenu(389000,this)" class="buffet-card bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500 transition text-center">
+            <span class="text-slate-300 font-bold">BUFFET</span>
+            <span class="block text-2xl text-red-500 font-black mt-2">389.000đ</span>
+          </button>
+          <button type="button" onclick="showBuffetMenu(469000,this)" class="buffet-card bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500 transition text-center">
+            <span class="text-slate-300 font-bold">BUFFET</span>
+            <span class="block text-2xl text-red-500 font-black mt-2">469.000đ</span>
+          </button>
+        </div>
+
+                <!-- SPECIAL MENU: nằm riêng bên dưới các mức giá -->
+        <button type="button" onclick="showSpecialMenu(this)"
+          class="buffet-card mt-4 w-full rounded-2xl border border-amber-500/60 bg-gradient-to-r from-red-950 via-red-900 to-red-950 p-6 text-center hover:border-amber-400 hover:-translate-y-0.5 transition">
+          <span class="block text-xs font-bold tracking-[0.4em] text-amber-300">
+            <i class="fa-solid fa-star mr-2"></i>MENU ĐẶC BIỆT<i class="fa-solid fa-star ml-2"></i>
+          </span>
+          <span class="block text-3xl font-black text-white mt-2 tracking-wider">SPECIAL MENU</span>
+          <span class="block text-sm text-amber-200 mt-1">Áp dụng menu 349K – 389K – 469K</span>
+        </button>
+
+        <div id="buffetMenuDetail" class="hidden mt-10 bg-slate-950 border border-red-950 rounded-3xl p-7 md:p-10">
+          <div class="text-center">
+            <p id="buffetMenuLabel" class="text-slate-400 text-sm uppercase tracking-widest">MENU GÓI</p>
+            <h4 id="buffetMenuPrice" class="text-4xl font-black text-red-500 mt-2"></h4>
+          </div>
+          <div id="buffetFoodList" class="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-8"></div>
+        </div>
+      </section>
+
+      <!-- ===== À LA CARTE ===== -->
+      <section id="alacarteSection" class="menu-section hidden max-w-5xl mx-auto">
+        <button type="button" onclick="backToMenuTypes()"
+          class="mb-7 px-5 py-2 rounded-xl border border-amber-700 text-slate-200 hover:bg-amber-700 transition">
+          <i class="fa-solid fa-arrow-left mr-2"></i>QUAY LẠI
+        </button>
+        <div class="text-center mb-8">
+          <h3 class="text-3xl font-bold text-white">MENU ALACARTE</h3>
+        </div>
+        <div id="alacarteList" class="grid grid-cols-1 sm:grid-cols-2 gap-5"></div>
+      </section>
+
+      <!-- ===== NƯỚC ===== -->
+      <section id="drinkSection" class="menu-section hidden max-w-5xl mx-auto">
+        <button type="button" onclick="backToMenuTypes()"
+          class="mb-7 px-5 py-2 rounded-xl border border-sky-700 text-slate-200 hover:bg-sky-700 transition">
+          <i class="fa-solid fa-arrow-left mr-2"></i>QUAY LẠI
+        </button>
+        <div class="text-center mb-8">
+          <h3 class="text-3xl font-bold text-white">MENU NƯỚC</h3>
+        </div>
+        <div id="drinkList" class="grid grid-cols-1 sm:grid-cols-2 gap-5"></div>
+      </section>
+
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- 3. ĐẶT BÀN -->
+    <!-- ========================================================= -->
+    {% include 'datban.html' %}
+
+    <!-- ========================================================= -->
+    <!-- 4. ĐĂNG NHẬP - 3 Ô CHỈ HIỆN KHI BẤM ĐĂNG NHẬP -->
+    <!-- ========================================================= -->
+
+    <div id="view-login" class="hidden space-y-8">
+
+
+      <div class="text-center">
+
+        <h2 class="text-3xl font-bold text-white uppercase tracking-wider">
+          ĐĂNG NHẬP HỆ THỐNG
+        </h2>
+
+        <p class="text-slate-400 mt-2">
+          Vui lòng lựa chọn bộ phận làm việc
+        </p>
+
+      </div>
+
+
+      <!-- 3 ô đăng nhập -->
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+
+        <!-- QUẢN LÍ -->
+
+        <button
+          onclick="location.href='/quanli'"
+          class="login-card bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-red-500 rounded-2xl p-10 flex flex-col items-center justify-center group shadow-xl">
+
+          <div
+            class="w-20 h-20 rounded-full bg-slate-950 border border-slate-800 group-hover:border-red-500/50 flex items-center justify-center text-red-500 text-3xl mb-6">
+
+            <i class="fa-solid fa-user-shield"></i>
+
+          </div>
+
+          <span
+            class="text-2xl font-black tracking-wide text-white group-hover:text-red-400 transition">
+
+            QUẢN LÍ
+
+          </span>
+
+          <span class="text-xs text-slate-500 mt-2">
+            Quản trị hệ thống
+          </span>
+
+        </button>
+
+
+
+        <!-- THU NGÂN -->
+
+        <button
+          onclick="location.href='/thungan'"
+          class="login-card bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500 rounded-2xl p-10 flex flex-col items-center justify-center group shadow-xl">
+
+          <div
+            class="w-20 h-20 rounded-full bg-slate-950 border border-slate-800 group-hover:border-amber-500/50 flex items-center justify-center text-amber-500 text-3xl mb-6">
+
+            <i class="fa-solid fa-cash-register"></i>
+
+          </div>
+
+          <span
+            class="text-2xl font-black tracking-wide text-white group-hover:text-amber-400 transition">
+
+            THU NGÂN
+
+          </span>
+
+          <span class="text-xs text-slate-500 mt-2">
+            Quầy thanh toán
+          </span>
+
+        </button>
+
+
+
+        <!-- NHÂN VIÊN -->
+
+        <button
+          onclick="switchView('view-staff-choice')"
+          class="login-card bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-sky-500 rounded-2xl p-10 flex flex-col items-center justify-center group shadow-xl">
+
+          <div
+            class="w-20 h-20 rounded-full bg-slate-950 border border-slate-800 group-hover:border-sky-500/50 flex items-center justify-center text-sky-400 text-3xl mb-6">
+
+            <i class="fa-solid fa-users-gear"></i>
+
+          </div>
+
+          <span
+            class="text-2xl font-black tracking-wide text-white group-hover:text-sky-400 transition">
+
+            PHỤC VỤ / BẾP
+
+          </span>
+
+          <span class="text-xs text-slate-500 mt-2">
+            Nhân viên phục vụ &amp; bếp
+          </span>
+
+        </button>
+
+
+      </div>
+
+    </div>
+
+
+
+    <!-- ========================================================= -->
+    <!-- 5. LIÊN HỆ -->
+    <!-- ========================================================= -->
+
+    <div id="view-contact" class="hidden space-y-8">
+
+
+      <div class="text-center">
+
+        <h2 class="text-3xl font-bold text-white uppercase tracking-wider">
+          LIÊN HỆ
+        </h2>
+
+        <p class="text-slate-400 mt-2">
+          Gyu Sachi - Nhà hàng lẩu nướng Nhật Bản
+        </p>
+
+      </div>
+
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+
+        <div
+          class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
+
+          <i class="fa-solid fa-location-dot text-3xl text-red-500 mb-4"></i>
+
+          <h3 class="font-bold text-white">
+            Địa chỉ
+          </h3>
+
+          <p class="text-sm text-slate-400 mt-2">
+            Đà Nẵng, Việt Nam
+          </p>
+
+        </div>
+
+
+        <div
+          class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
+
+          <i class="fa-solid fa-phone text-3xl text-red-500 mb-4"></i>
+
+          <h3 class="font-bold text-white">
+            Điện thoại
+          </h3>
+
+          <p class="text-sm text-slate-400 mt-2">
+            Liên hệ nhà hàng
+          </p>
+
+        </div>
+
+
+        <div
+          class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
+
+          <i class="fa-solid fa-clock text-3xl text-red-500 mb-4"></i>
+
+          <h3 class="font-bold text-white">
+            Giờ mở cửa
+          </h3>
+
+          <p class="text-sm text-slate-400 mt-2">
+            Phục vụ hàng ngày
+          </p>
+
+        </div>
+
+
+      </div>
+
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- 8. CHỌN NHÂN VIÊN -->
+    <!-- ========================================================= -->
+
+    <div id="view-staff-choice" class="hidden space-y-6">
+
+
+      <button
+        onclick="backToLogin()"
+        class="text-slate-400 hover:text-white flex items-center gap-2 text-sm font-semibold">
+
+        <i class="fa-solid fa-arrow-left"></i>
+
+        Quay lại đăng nhập
+
+      </button>
+
+
+      <div class="text-center mb-6">
+
+        <h2 class="text-2xl font-bold text-white uppercase tracking-wider">
+          LỰA CHỌN BỘ PHẬN NHÂN VIÊN
+        </h2>
+
+      </div>
+
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+
+
+        <button
+          onclick="switchView('view-staff-list')"
+          class="bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500 rounded-2xl p-8 flex flex-col items-center group transition">
+
+          <i class="fa-solid fa-clipboard-user text-4xl text-amber-400 mb-4 group-hover:scale-110 transition"></i>
+
+          <span class="text-xl font-bold text-white">
+            NHÂN VIÊN PHỤC VỤ
+          </span>
+
+        </button>
+
+
+        <button
+          onclick="switchView('view-kitchen-stations')"
+          class="bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-rose-500 rounded-2xl p-8 flex flex-col items-center group transition">
+
+          <i class="fa-solid fa-fire-burner text-4xl text-rose-500 mb-4 group-hover:scale-110 transition"></i>
+
+          <span class="text-xl font-bold text-white">
+            NHÂN VIÊN BẾP
+          </span>
+
+        </button>
+
+
+      </div>
+
+    </div>
+
+
+
+    <!-- ========================================================= -->
+    <!-- 9. DANH SÁCH NHÂN VIÊN -->
+    <!-- ========================================================= -->
+
+    <div id="view-staff-list" class="hidden space-y-6">
+
+
+      <button
+        onclick="switchView('view-staff-choice')"
+        class="text-slate-400 hover:text-white flex items-center gap-2 text-sm font-semibold">
+
+        <i class="fa-solid fa-arrow-left"></i>
+
+        Quay lại
+
+      </button>
+
+
+      <div class="text-center mb-6">
+
+        <h2 class="text-2xl font-bold text-white uppercase tracking-wider">
+          CHỌN TÀI KHOẢN NHÂN VIÊN
+        </h2>
+
+        <p class="text-slate-400 text-sm mt-1">
+          Chạm vào tên bạn để xác nhận mã PIN vào ca
+        </p>
+
+      </div>
+
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
+
+        {% for s in staffs %}
+
+        <div
+          onclick="openPinModal('{{ s.name }}', '{{ s.id }}')"
+          class="bg-slate-900 border border-slate-800 hover:border-amber-500 rounded-2xl p-6 flex flex-col items-center cursor-pointer transition transform hover:-translate-y-1 shadow-lg">
+
+
+          <img
+            src="{{ s.avatar }}"
+            class="w-20 h-20 rounded-full object-cover ring-2 ring-slate-700 mb-3"
+            alt="Avatar">
+
+
+          <h3 class="font-bold text-white text-lg">
+            {{ s.name }}
+          </h3>
+
+
+          <span class="text-xs text-amber-400 font-semibold mt-1">
+            MÃ: {{ s.id }}
+          </span>
+
+
+          <span class="text-xs text-slate-400 mt-0.5">
+            {{ s.role }}
+          </span>
+
+
+        </div>
+
+        {% endfor %}
+
+      </div>
+
+    </div>
+
+
+
+    <!-- ========================================================= -->
+    <!-- 10. TRẠM BẾP -->
+    <!-- ========================================================= -->
+
+    <div id="view-kitchen-stations" class="hidden space-y-6">
+
+
+      <button
+        onclick="switchView('view-staff-choice')"
+        class="text-slate-400 hover:text-white flex items-center gap-2 text-sm font-semibold">
+
+        <i class="fa-solid fa-arrow-left"></i>
+
+        Quay lại
+
+      </button>
+
+
+      <div class="text-center mb-6">
+
+        <h2 class="text-2xl font-bold text-white uppercase tracking-wider">
+          CHỌN KHU VỰC / TRẠM BẾP
+        </h2>
+
+        <p class="text-slate-400 text-sm mt-1">
+          Chạm vào trạm trực để mở màn hình tiếp nhận món
+        </p>
+
+      </div>
+
+
+      <!-- 3 trạm đầu -->
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+
+        {% for st in stations[:3] %}
+
+        <div
+          onclick="openPinModal('{{ st.name }}', '{{ st.id }}')"
+          class="bg-slate-900 border border-slate-800 hover:border-rose-500 rounded-2xl p-6 flex flex-col items-center cursor-pointer transition transform hover:-translate-y-1 shadow-lg">
+
+
+          <i class="fa-solid {{ st.icon }} text-3xl text-rose-400 mb-3"></i>
+
+
+          <h3 class="font-bold text-white text-lg">
+            {{ st.name }}
+          </h3>
+
+
+          <p class="text-xs text-slate-400 text-center mt-1">
+            {{ st.desc }}
+          </p>
+
+
+          <span
+            class="mt-3 px-3 py-0.5 bg-slate-950 text-rose-300 rounded-full text-[11px] font-semibold border border-rose-500/30">
+
+            MÃ: {{ st.id }}
+
+          </span>
+
+
+        </div>
+
+        {% endfor %}
+
+      </div>
+
+
+      <!-- 2 trạm dưới -->
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto mt-4">
+
+        {% for st in stations[3:] %}
+
+        <div
+          onclick="openPinModal('{{ st.name }}', '{{ st.id }}')"
+          class="bg-slate-900 border border-slate-800 hover:border-rose-500 rounded-2xl p-6 flex flex-col items-center cursor-pointer transition transform hover:-translate-y-1 shadow-lg">
+
+
+          <i class="fa-solid {{ st.icon }} text-3xl text-rose-400 mb-3"></i>
+
+
+          <h3 class="font-bold text-white text-lg">
+            {{ st.name }}
+          </h3>
+
+
+          <p class="text-xs text-slate-400 text-center mt-1">
+            {{ st.desc }}
+          </p>
+
+
+          <span
+            class="mt-3 px-3 py-0.5 bg-slate-950 text-rose-300 rounded-full text-[11px] font-semibold border border-rose-500/30">
+
+            MÃ: {{ st.id }}
+
+          </span>
+
+
+        </div>
+
+        {% endfor %}
+
+      </div>
+    </div>
+</main>
+  <!-- ========================================================= -->
+  <!-- FOOTER -->
+  <!-- ========================================================= -->
+
+  <footer
+    class="p-6 text-center text-xs text-slate-600 border-t border-slate-900">
+
+    Hệ Thống Quản Trị Nhà Hàng Gyu Sachi • POS System v2.5
+
+  </footer>
+
+
+
+  <!-- ========================================================= -->
+  <!-- POPUP NHẬP PIN -->
+  <!-- ========================================================= -->
+
+  <div
+    id="pinModal"
+    class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+
+
+    <div
+      class="bg-slate-900 border border-slate-800 w-full max-w-xs rounded-3xl p-6 text-center shadow-2xl">
+
+
+      <h3
+        id="pinModalTitle"
+        class="text-lg font-bold text-white mb-1">
+      </h3>
+
+
+      <p class="text-xs text-slate-400 mb-4">
+        Nhập mã PIN xác thực để vào ca
+      </p>
+
+
+      <input
+        id="pinInput"
+        type="password"
+        maxlength="4"
+        placeholder="••••"
+        class="w-full tracking-widest text-center text-2xl py-2.5 bg-slate-950 border border-slate-800 rounded-xl mb-4 text-amber-400 font-bold focus:outline-none">
+
+
+      <div class="flex gap-2">
+
+
+        <button
+          onclick="closePinModal()"
+          class="w-1/2 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold text-slate-300 transition">
+
+          HỦY
+
+        </button>
+
+
+        <button
+          onclick="handleLoginSuccess()"
+          class="w-1/2 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition">
+
+          VÀO CA
+
+        </button>
+
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- ========================================================= -->
+  <!-- JAVASCRIPT -->
+  <!-- ========================================================= -->
+
+  <script>
+
+
+    // =========================================================
+    // DANH SÁCH TẤT CẢ CÁC VIEW
+    // =========================================================
+
+    function switchView(viewId) {
+
+      const views = [
+        'view-home',
+        'view-menu',
+        'view-reservation',
+        'view-login',
+        'view-contact',
+        'view-staff-choice',
+        'view-staff-list',
+        'view-kitchen-stations'
+      ];
+
+
+      views.forEach(function(v) {
+
+        const el = document.getElementById(v);
+
+        if (el) {
+          el.classList.add('hidden');
+        }
+
+      });
+
+
+      const selectedView = document.getElementById(viewId);
+
+      if (selectedView) {
+        selectedView.classList.remove('hidden');
+      }
+
+
+      // Cuộn lên đầu nội dung
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+
+    }
+
+
+
+    // =========================================================
+    // MENU ACTIVE
+    // =========================================================
+
+    function setActiveMenu(menuId) {
+
+      const menus = [
+        // Menu nhan vien
+        'nav-home',
+        'nav-menu',
+        'nav-reservation',
+        'nav-login',
+        'nav-contact',
+        // Menu khach hang
+        'customer-nav-program',
+        'customer-nav-menu',
+        'customer-nav-reservation',
+        'customer-nav-contact'
+      ];
+
+
+      menus.forEach(function(id) {
+
+        const menu = document.getElementById(id);
+
+        if (menu) {
+          menu.classList.remove('menu-active');
+        }
+
+      });
+
+
+      const activeMenu = document.getElementById(menuId);
+
+      if (activeMenu) {
+        activeMenu.classList.add('menu-active');
+      }
+
+    }
+
+    function backToEntry() {
+    // Hiện lại màn hình chọn Khách hàng / Nhân viên
+    document.getElementById('entryScreen').classList.remove('hidden');
+
+    // Ẩn nút quay lại và 2 thanh menu
+    document.getElementById('backToEntry').classList.add('hidden');
+    document.getElementById('customerMenu').classList.add('hidden');
+    document.getElementById('employeeMenu').classList.add('hidden');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// =========================================================
+// MÀN HÌNH CHỌN KHÁCH HÀNG / NHÂN VIÊN
+// =========================================================
+
+function enterCustomer() {
+    document.getElementById('entryScreen').classList.add('hidden');
+    document.getElementById('backToEntry').classList.remove('hidden');
+
+    // Hien menu khach hang, an menu nhan vien
+    document.getElementById('customerMenu').classList.remove('hidden');
+    document.getElementById('employeeMenu').classList.add('hidden');
+
+    switchView('view-home');
+    setActiveMenu('customer-nav-program');
+}
+
+function enterEmployee() {
+    document.getElementById('entryScreen').classList.add('hidden');
+    document.getElementById('backToEntry').classList.remove('hidden');
+
+    // Khu nhan vien: an ca 2 thanh menu, chi hien 3 o dang nhap
+    document.getElementById('employeeMenu').classList.add('hidden');
+    document.getElementById('customerMenu').classList.add('hidden');
+
+    switchView('view-login');
+    setActiveMenu('nav-login');
+}
+
+    // =========================================================
+    // QUAY LẠI TRANG ĐĂNG NHẬP
+    // =========================================================
+
+    function backToLogin() {
+
+      switchView('view-login');
+
+      setActiveMenu('nav-login');
+
+    }
+
+
+
+    // =========================================================
+    // POPUP PIN
+    // =========================================================
+
+    let selectedStaffId = null;
+
+
+    function openPinModal(title, id) {
+
+      selectedStaffId = id;
+
+      document.getElementById('pinModalTitle').innerText = title;
+
+      document.getElementById('pinInput').value = '';
+
+      document.getElementById('pinModal').classList.remove('hidden');
+
+      setTimeout(function() {
+
+        document.getElementById('pinInput').focus();
+
+      }, 100);
+
+    }
+
+
+
+    function closePinModal() {
+
+      document.getElementById('pinModal').classList.add('hidden');
+
+    }
+
+
+
+    // =========================================================
+    // XÁC THỰC PIN
+    // =========================================================
+
+    async function handleLoginSuccess() {
+
+      const pin = document.getElementById('pinInput').value;
+
+
+      if (!pin) {
+
+        alert('Vui lòng nhập mã PIN!');
+
+        return;
+
+      }
+
+
+      try {
+
+        const response = await fetch('/api/verify-pin', {
+
+          method: 'POST',
+
+          headers: {
+            'Content-Type': 'application/json'
+          },
+
+          body: JSON.stringify({
+            id: selectedStaffId,
+            pin: pin
+          })
+
+        });
+
+
+        const data = await response.json();
+
+        if (data.success) {
+
+          closePinModal();
+
+          if (data.redirect) {
+            window.location.href = data.redirect;
+          } else {
+            alert(data.message);
+          }
+
+        } else {
+
+          alert(data.message);
+
+        }
+
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert('Không thể kết nối đến máy chủ!');
+
+      }
+
+    }
+    function openMenuSection(sectionId) {
+      document.getElementById('menuTypes').classList.add('hidden');
+      document.querySelectorAll('.menu-section').forEach(function(s) {
+        s.classList.add('hidden');
+      });
+      document.getElementById(sectionId).classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function backToMenuTypes() {
+      document.getElementById('menuTypes').classList.remove('hidden');
+      document.querySelectorAll('.menu-section').forEach(function(s) {
+        s.classList.add('hidden');
+      });
+      document.getElementById('buffetMenuDetail').classList.add('hidden');
+      document.querySelectorAll('.buffet-card').forEach(function(c) {
+        c.classList.remove('selected');
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function loadCategoryImages(category, listId) {
+      const list = document.getElementById(listId);
+      list.innerHTML = '';
+
+      try {
+        const response = await fetch('/api/menu-category/' + category);
+        const data = await response.json();
+
+        if (!data.images || data.images.length === 0) {
+          list.innerHTML = '<p class="text-slate-400 col-span-full text-center">Chưa có hình ảnh.</p>';
+          return;
+        }
+
+        data.images.forEach(function(fileName) {
+          list.innerHTML += `
+            <div class="overflow-hidden rounded-xl bg-zinc-900" style="aspect-ratio: 210 / 297;">
+              <img src="/static/images/menu/${category}/${fileName}"
+                   alt="Menu"
+                   class="w-full h-full object-contain"
+                   onerror="this.parentElement.remove()">
+            </div>`;
+        });
+      } catch (error) {
+        console.error(error);
+        list.innerHTML = '<p class="text-red-400 col-span-full text-center">Không tải được hình ảnh.</p>';
+      }
+    }
+
+    // Special Menu: ảnh nằm trong static/images/menu/special/
+async function showSpecialMenu(card) {
+  document.querySelectorAll('.buffet-card').forEach(function(item) {
+    item.classList.remove('selected');
+  });
+  if (card) card.classList.add('selected');
+
+  document.getElementById('buffetMenuLabel').textContent = 'ÁP DỤNG MENU 349K – 389K – 469K';
+  document.getElementById('buffetMenuPrice').textContent = 'SPECIAL MENU';
+
+  const detail = document.getElementById('buffetMenuDetail');
+  const foodList = document.getElementById('buffetFoodList');
+
+  foodList.className = 'grid grid-cols-1 sm:grid-cols-2 gap-5 mt-8';
+  foodList.innerHTML = '';
+  detail.classList.remove('hidden');
+
+  try {
+    const response = await fetch('/api/menu-images/special');
+    const data = await response.json();
+
+    if (!data.images || data.images.length === 0) {
+      foodList.innerHTML = '<p class="text-gray-400 col-span-full text-center">Chưa có hình ảnh.</p>';
+      return;
+    }
+
+    data.images.forEach(function(fileName) {
+      foodList.innerHTML += `
+        <div class="overflow-hidden rounded-xl bg-zinc-900 mx-auto w-full" style="aspect-ratio: 210 / 297;">
+          <img src="/static/images/menu/special/${fileName}"
+               alt="Special menu"
+               class="w-full h-full object-contain"
+               onerror="this.parentElement.remove()">
+        </div>`;
+    });
+  } catch (error) {
+    console.error('Lỗi tải ảnh:', error);
+    foodList.innerHTML = '<p class="text-red-400 col-span-full text-center">Không tải được hình ảnh.</p>';
+  }
+
+  detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function showBuffetMenu(price, card) {
+  document.getElementById('buffetMenuLabel').textContent = 'MENU GÓI';   // <-- dòng thêm
+  document.querySelectorAll('.buffet-card').forEach(function(item) {
+    item.classList.remove('selected');
+  });
+
+  if (card) {
+    card.classList.add('selected');
+  }
+
+  document.getElementById('buffetMenuPrice').textContent =
+    price.toLocaleString('vi-VN') + 'đ';
+
+  const detail = document.getElementById('buffetMenuDetail');
+  const foodList = document.getElementById('buffetFoodList');
+
+  foodList.innerHTML = '';
+  detail.classList.remove('hidden');
+
+  try {
+    const response = await fetch(
+      `/api/menu-images/${price / 1000}`
+    );
+
+    const data = await response.json();
+
+    if (!data.images || data.images.length === 0) {
+      foodList.innerHTML =
+        '<p class="text-gray-400">Chưa có hình ảnh.</p>';
+      return;
+    }
+
+     // Chỉ menu 199K là khổ A4 ngang
+    const isLandscape = (price === 199000);
+
+    // Đổi lưới theo từng loại
+    foodList.className = isLandscape
+      ? 'grid grid-cols-1 gap-6 mt-8 max-w-4xl mx-auto'
+      : 'grid grid-cols-1 sm:grid-cols-2 gap-5 mt-8';
+
+    const ratio = isLandscape ? '297 / 210' : '210 / 297';
+
+    data.images.forEach(function(fileName) {
+      const imagePath =
+        `/static/images/menu/${price / 1000}/${fileName}`;
+
+      foodList.innerHTML += `
+        <div class="overflow-hidden rounded-xl bg-zinc-900 mx-auto w-full"
+             style="aspect-ratio: ${ratio};">
+          <img
+            src="${imagePath}"
+            alt="Menu buffet"
+            class="w-full h-full object-contain"
+            onerror="this.parentElement.remove()">
+        </div>
+      `;
+    });
+
+  } catch (error) {
+    console.error('Lỗi tải ảnh:', error);
+    foodList.innerHTML =
+      '<p class="text-red-400">Không tải được hình ảnh.</p>';
+  }
+
+  detail.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  });
+}
+
+// Quay về trang "Lựa chọn bộ phận nhân viên" khi bấm ĐĂNG XUẤT từ trang phục vụ / bếp
+window.addEventListener('DOMContentLoaded', function () {
+  if (location.hash === '#staff-choice') {
+    enterEmployee();
+    switchView('view-staff-choice');
+    history.replaceState(null, '', '/');
+  }
+});
+
+  </script>
+
+
+</body>
+
+</html>

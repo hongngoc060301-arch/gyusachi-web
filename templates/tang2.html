@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Sơ đồ tầng 2</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f2ec;
+            color: #333;
+        }
+
+        /* =========================
+           TIÊU ĐỀ
+           ========================= */
+
+        .container {
+            width: 1000px;
+            max-width: 95%;
+            margin: 30px auto;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 36px;
+            margin-bottom: 8px;
+            color: #222;
+        }
+
+        .subtitle {
+            color: #777;
+            margin-bottom: 25px;
+        }
+
+
+        /* =========================
+           KHUNG SƠ ĐỒ
+           ========================= */
+
+        .floor {
+
+            position: relative;
+
+            width: 850px;
+            height: 850px;
+
+            margin: auto;
+
+            background: white;
+
+            border: 5px solid #333;
+
+            border-radius: 8px;
+
+            overflow: hidden;
+        }
+
+
+        /* =========================
+           V1
+           ========================= */
+
+        .v1 {
+
+            position: absolute;
+
+            top: 0;
+            left: 0;
+
+            width: 50%;
+            height: 155px;
+
+            background: #f5f5f5;
+
+            border-right: 4px solid #333;
+            border-bottom: 4px solid #333;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            font-size: 40px;
+            font-weight: bold;
+
+            color: #333;
+        }
+
+
+        /* =========================
+           V2
+           ========================= */
+
+        .v2 {
+
+            position: absolute;
+
+            top: 0;
+            right: 0;
+
+            width: 50%;
+            height: 155px;
+
+            background: #f5f5f5;
+
+            border-bottom: 4px solid #333;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            font-size: 40px;
+            font-weight: bold;
+
+            color: #333;
+        }
+
+
+        /* =========================
+           LỐI ĐI GIỮA
+           ========================= */
+
+        .walkway {
+
+            position: absolute;
+
+            top: 155px;
+            left: 330px;
+
+            width: 190px;
+            height: 690px;
+
+            background: #fff8d8;
+
+            border-left: 3px solid #333;
+            border-right: 3px solid #333;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            flex-direction: column;
+
+            color: #a05216;
+
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .walkway-arrow {
+
+            font-size: 38px;
+
+            margin-top: 15px;
+        }
+
+
+        /* =========================
+           KHU BÀN B1 -> B5
+           ========================= */
+
+        .left-tables {
+
+            position: absolute;
+
+            top: 155px;
+            left: 0;
+
+            width: 330px;
+            height: 600px;
+        }
+
+
+        .table-left {
+
+            width: 330px;
+            height: 100px;
+
+            background: #e8f4ff;
+
+            border-right: 3px solid #333;
+            border-bottom: 3px solid #333;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            font-size: 28px;
+            font-weight: bold;
+
+            color: #17638c;
+
+            cursor: pointer;
+
+            transition: 0.2s;
+        }
+
+
+        .table-left:hover {
+
+            background: #bde3ff;
+
+            transform: scale(1.02);
+
+            position: relative;
+
+            z-index: 5;
+        }
+
+
+        /* =========================
+           BÀN B9
+           ========================= */
+
+        .b9 {
+
+            position: absolute;
+
+            top: 155px;
+            right: 110px;
+
+            width: 220px;
+            height: 95px;
+
+            background: #e8f4ff;
+
+            border-left: 3px solid #333;
+            border-right: 3px solid #333;
+            border-bottom: 3px solid #333;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            font-size: 28px;
+            font-weight: bold;
+
+            color: #17638c;
+
+            cursor: pointer;
+        }
+
+
+        /* =========================
+           BÀN B8
+           ========================= */
+
+        .b8 {
+
+            position: absolute;
+
+            top: 250px;
+            right: 110px;
+
+            width: 220px;
+            height: 95px;
+
+            background: #e8f4ff;
+
+            border-left: 3px solid #333;
+            border-right: 3px solid #333;
+            border-bottom: 3px solid #333;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            font-size: 28px;
+            font-weight: bold;
+
+            color: #17638c;
+
+            cursor: pointer;
+        }
+
+
+        .b9:hover,
+        .b8:hover {
+
+            background: #bde3ff;
+
+            transform: scale(1.02);
+
+            position: absolute;
+
+            z-index: 5;
+        }
+
+
+        /* =========================
+           CẦU THANG
+           ========================= */
+
+        .stairs {
+
+            position: absolute;
+
+            top: 155px;
+            right: 0;
+
+            width: 110px;
+            height: 190px;
+
+            background: #dedfe3;
+
+            border-left: 3px solid #333;
+            border-bottom: 3px solid #333;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            flex-direction: column;
+
+            font-size: 18px;
+            font-weight: bold;
+
+            color: #444;
+        }
+
+
+        .stairs-icon {
+
+            font-size: 35px;
+
+            margin-bottom: 10px;
+        }
+
+
+        /* =========================
+           B6
+           ========================= */
+
+        .b6 {
+
+            position: absolute;
+
+            top: 510px;
+            right: 0;
+
+            width: 250px;
+            height: 100px;
+
+            background: #e8f4ff;
+
+            border-left: 3px solid #333;
+            border-bottom: 3px solid #333;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            font-size: 28px;
+            font-weight: bold;
+
+            color: #17638c;
+
+            cursor: pointer;
+        }
+
+
+        /* =========================
+           B7
+           ========================= */
+
+        .b7 {
+
+            position: absolute;
+
+            top: 610px;
+            right: 0;
+
+            width: 250px;
+            height: 105px;
+
+            background: #e8f4ff;
+
+            border-left: 3px solid #333;
+            border-bottom: 3px solid #333;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            font-size: 28px;
+            font-weight: bold;
+
+            color: #17638c;
+
+            cursor: pointer;
+        }
+
+
+        .b6:hover,
+        .b7:hover {
+
+            background: #bde3ff;
+
+            transform: scale(1.02);
+
+            position: absolute;
+
+            z-index: 5;
+        }
+
+
+        /* =========================
+           TOILET
+           ========================= */
+
+        .toilet {
+
+            position: absolute;
+
+            bottom: 0;
+            left: 0;
+
+            width: 330px;
+            height: 100px;
+
+            background: #eeeeee;
+
+            border-right: 3px solid #333;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            font-size: 23px;
+
+            font-weight: bold;
+
+            color: #555;
+        }
+
+
+        /* =========================
+           TRẠNG THÁI BÀN
+           ========================= */
+
+        .available {
+
+            background: #b9f6c5 !important;
+
+            color: #126b2f !important;
+        }
+
+
+        .booked {
+
+            background: #ffb8b8 !important;
+
+            color: #9b1c1c !important;
+
+            cursor: not-allowed;
+        }
+
+
+        /* =========================
+           CHÚ THÍCH
+           ========================= */
+
+        .legend {
+
+            display: flex;
+
+            justify-content: center;
+
+            gap: 30px;
+
+            margin-top: 25px;
+
+            font-size: 16px;
+        }
+
+
+        .legend-item {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 8px;
+        }
+
+
+        .color-box {
+
+            width: 25px;
+            height: 25px;
+
+            border-radius: 5px;
+
+            border: 1px solid #777;
+        }
+
+
+        .normal {
+
+            background: #e8f4ff;
+        }
+
+
+        .green {
+
+            background: #b9f6c5;
+        }
+
+
+        .red {
+
+            background: #ffb8b8;
+        }
+
+
+        /* =========================
+           NÚT QUAY LẠI
+           ========================= */
+
+        .back {
+
+            margin-top: 25px;
+
+            padding: 12px 25px;
+
+            border: none;
+
+            border-radius: 8px;
+
+            background: #333;
+
+            color: white;
+
+            font-size: 16px;
+
+            cursor: pointer;
+        }
+
+
+        .back:hover {
+
+            background: #555;
+        }
+
+
+        /* =========================
+           MOBILE
+           ========================= */
+
+        @media (max-width: 900px) {
+
+            .floor {
+
+                transform: scale(0.8);
+
+                transform-origin: top center;
+
+                margin-bottom: -150px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<div class="container">
+
+
+    <h1>SƠ ĐỒ TẦNG 2</h1>
+
+    <div class="subtitle">
+        Sơ đồ khu vực nhà hàng - Tầng 2
+    </div>
+
+
+    <!-- =========================
+         SƠ ĐỒ TẦNG 2
+         ========================= -->
+
+    <div class="floor">
+
+
+        <!-- V1 -->
+
+        <div class="v1">
+            V1
+        </div>
+
+
+        <!-- V2 -->
+
+        <div class="v2">
+            V2
+        </div>
+
+
+        <!-- LỐI ĐI -->
+
+        <div class="walkway">
+
+            <div>🚶</div>
+
+            <div>LỐI ĐI</div>
+
+            <div class="walkway-arrow">
+                ↓
+            </div>
+
+        </div>
+
+
+        <!-- =====================
+             BÀN B5 -> B1
+             ===================== -->
+
+        <div class="left-tables">
+
+            <div class="table-left">
+                B5
+            </div>
+
+            <div class="table-left">
+                B4
+            </div>
+
+            <div class="table-left">
+                B3
+            </div>
+
+            <div class="table-left">
+                B2
+            </div>
+
+            <div class="table-left">
+                B1
+            </div>
+
+        </div>
+
+
+        <!-- =====================
+             B9
+             ===================== -->
+
+        <div class="b9">
+            B9
+        </div>
+
+
+        <!-- =====================
+             B8
+             ===================== -->
+
+        <div class="b8">
+            B8
+        </div>
+
+
+        <!-- =====================
+             CẦU THANG
+             ===================== -->
+
+        <div class="stairs">
+
+            <div class="stairs-icon">
+                🪜
+            </div>
+
+            CẦU THANG
+
+        </div>
+
+
+        <!-- =====================
+             B6
+             ===================== -->
+
+        <div class="b6">
+            B6
+        </div>
+
+
+        <!-- =====================
+             B7
+             ===================== -->
+
+        <div class="b7">
+            B7
+        </div>
+
+
+        <!-- =====================
+             TOILET
+             ===================== -->
+
+        <div class="toilet">
+            🚻 TOILET
+        </div>
+
+
+    </div>
+
+
+    <!-- =========================
+         CHÚ THÍCH
+         ========================= -->
+
+    <div class="legend">
+
+        <div class="legend-item">
+
+            <div class="color-box normal"></div>
+
+            Bàn bình thường
+
+        </div>
+
+
+        <div class="legend-item">
+
+            <div class="color-box green"></div>
+
+            Bàn phù hợp
+
+        </div>
+
+
+        <div class="legend-item">
+
+            <div class="color-box red"></div>
+
+            Bàn đã đặt
+
+        </div>
+
+    </div>
+
+
+    <button class="back" onclick="history.back()">
+        ← Quay lại
+    </button>
+
+
+</div>
+
+
+</body>
+</html>
