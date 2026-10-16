@@ -19,6 +19,17 @@
     .fld:focus { border-color: #ef4444; }
     .lbl { display: block; font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .1em; margin-bottom: .25rem; }
     select.fld option { background: #0f172a; }
+
+    /* In / lưu PDF: nền trắng chữ đen, ẩn thanh điều khiển */
+    @media print {
+      header, #rangeBar, #toast, .no-print, #invModal, .modal-box { display: none !important; }
+      body { background: #fff !important; color: #000 !important; }
+      body * { color: #111 !important; }
+      [class*="bg-slate-"], [class*="from-"] { background: #fff !important; }
+      [class*="border-"] { border-color: #bbb !important; }
+      main { padding: 0 !important; }
+      section { break-inside: avoid; }
+    }
   </style>
 </head>
 
@@ -89,7 +100,14 @@
         <input id="dFrom" type="date" onchange="customRange()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs">
         <span class="text-slate-500 text-xs">đến</span>
         <input id="dTo" type="date" onchange="customRange()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs">
+        <div class="flex-1"></div>
+        <button onclick="exportCsv()" class="px-3 py-1.5 rounded-lg border border-emerald-700 text-emerald-300 text-xs font-bold hover:bg-emerald-700 hover:text-white transition">
+          <i class="fa-solid fa-file-excel mr-1.5"></i>Xuất Excel</button>
+        <button onclick="printReport()" class="px-3 py-1.5 rounded-lg border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-700 transition">
+          <i class="fa-solid fa-print mr-1.5"></i>In / Lưu PDF</button>
       </div>
+      <div id="editNav" class="hidden flex flex-wrap gap-2 mb-5"></div>
+      <p id="printTitle" class="hidden print:block text-center text-xl font-black mb-4"></p>
 
       <!-- ===== 2. BÁO CÁO ===== -->
       <section id="v-report" class="hidden space-y-6">
@@ -130,6 +148,18 @@
                     <th class="text-right px-4 py-3">Giảm</th><th class="text-right px-4 py-3">Tổng</th></tr>
               </thead>
               <tbody id="rpInvoices"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="rpVoidBox" class="hidden bg-slate-900 border border-red-900/60 rounded-2xl overflow-hidden">
+          <div class="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+            <h3 class="text-xs font-bold text-red-300 uppercase tracking-widest">Hoá đơn đã huỷ (không tính vào doanh thu)</h3>
+            <span id="rpVoidCount" class="text-xs text-slate-500"></span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <tbody id="rpVoided"></tbody>
             </table>
           </div>
         </div>
@@ -325,6 +355,67 @@
           Ảnh menu và thẻ giá ở trang khách (index.html) là cố định, không tự đổi theo giá ở đây.</p>
       </section>
 
+      <!-- ===== 9. CẤU HÌNH ===== -->
+      <section id="v-settings" class="hidden max-w-2xl space-y-5">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+          <h3 class="text-sm font-black uppercase tracking-widest text-slate-300">Thuế &amp; giờ bán</h3>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div><label class="lbl">VAT (%)</label>
+              <input id="cfVat" type="number" min="0" max="30" step="0.5" class="fld" oninput="cfgExample()"></div>
+            <div><label class="lbl">Buổi trưa kết thúc lúc (giờ)</label>
+              <input id="cfLunch" type="number" min="10" max="20" step="1" class="fld" oninput="cfgExample()"></div>
+          </div>
+          <p class="text-[11px] text-slate-500">Bàn mở trước giờ này tính là buổi trưa, từ giờ này trở đi là buổi tối.</p>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+          <h3 class="text-sm font-black uppercase tracking-widest text-slate-300">Ưu đãi theo nhóm (đi N tính N−1)</h3>
+          <div><label class="lbl">Số người trong nhóm (N)</label>
+            <input id="cfGroup" type="number" min="2" max="20" step="1" class="fld sm:w-40" oninput="cfgExample()"></div>
+          <div><label class="lbl">Buổi tối áp dụng vào các ngày</label>
+            <div id="cfDays" class="flex flex-wrap gap-2"></div>
+            <p class="text-[11px] text-slate-500 mt-1">Buổi trưa luôn áp dụng mọi ngày (trừ ngày lễ).</p></div>
+          <div><label class="lbl">Ngày lễ không áp dụng ưu đãi</label>
+            <textarea id="cfHol" rows="6" class="fld font-mono" placeholder="02/09&#10;30/04&#10;06/02/2027"></textarea>
+            <p class="text-[11px] text-slate-500 mt-1">Mỗi ngày một dòng. <b class="text-slate-300">dd/mm</b> = lặp lại mỗi năm (VD 02/09),
+              <b class="text-slate-300">dd/mm/yyyy</b> = chỉ riêng năm đó (VD 06/02/2027 cho Tết).</p></div>
+        </div>
+
+        <p id="cfExample" class="text-sm text-amber-300 bg-amber-950/30 border border-amber-900/50 rounded-xl px-4 py-3"></p>
+        <p id="cfErr" class="hidden text-sm text-red-400"></p>
+        <div class="flex gap-3">
+          <button onclick="resetSettings()" class="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">KHÔI PHỤC MẶC ĐỊNH</button>
+          <button onclick="saveSettings()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU CẤU HÌNH</button>
+        </div>
+        <p class="text-xs text-slate-500">Đổi cấu hình có hiệu lực ngay cho các hoá đơn tính từ lúc này. Hoá đơn đã thanh toán giữ nguyên số tiền cũ.
+          Dòng chữ "Đi 4 tính 3" ở trang khách (index.html) là chữ cố định, bạn nhớ sửa tay nếu đổi quy tắc.</p>
+      </section>
+
+      <!-- ===== 10. NHẬT KÝ ===== -->
+      <section id="v-audit" class="hidden space-y-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="relative flex-1 min-w-[12rem]">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+            <input id="auSearch" oninput="clearTimeout(auTimer); auTimer = setTimeout(loadAudit, 300)" placeholder="Tìm theo thao tác, món, hoá đơn..."
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-red-500 outline-none text-sm">
+          </div>
+          <button onclick="loadAudit()" class="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-800 transition">
+            <i class="fa-solid fa-rotate mr-2"></i>Làm mới</button>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                <tr><th class="text-left px-4 py-3">Thời gian</th><th class="text-left px-4 py-3">Thao tác</th>
+                    <th class="text-left px-4 py-3">Đối tượng</th><th class="text-left px-4 py-3">Chi tiết</th></tr>
+              </thead>
+              <tbody id="auBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p id="auCount" class="text-xs text-slate-500"></p>
+      </section>
+
     </div>
   </main>
 </div>
@@ -341,6 +432,31 @@
       <button onclick="closeInv()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div id="invBody" class="mt-4 text-sm space-y-2"></div>
+  </div>
+</div>
+
+<!-- ================= SỬA MÓN ================= -->
+<div id="dishModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('dishModal')">
+  <div class="modal-box bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-start justify-between gap-3">
+      <h4 id="dmTitle" class="text-lg font-black text-white"></h4>
+      <button onclick="hideM('dishModal')" class="shrink-0 w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mt-4 space-y-4">
+      <div><label class="lbl">Tên món</label><input id="dmName" maxlength="255" class="fld"></div>
+      <div><label class="lbl">Nhóm món</label>
+        <select id="dmCat" onchange="onDmCat()" class="fld"></select>
+        <input id="dmCatNew" maxlength="100" placeholder="Nhập tên nhóm mới" class="hidden fld mt-2"></div>
+      <div><label class="lbl">Trạm bếp làm món</label>
+        <select id="dmStation" class="fld"></select>
+        <p id="dmComboNote" class="hidden text-[11px] text-slate-500 mt-1">Combo gồm nhiều món con (mỗi món con có trạm riêng) nên không đổi trạm ở đây.</p></div>
+      <p class="text-[11px] text-slate-500">Đổi tên chỉ áp dụng cho lần gọi sau, hoá đơn cũ giữ tên cũ.</p>
+      <p id="dmErr" class="hidden text-sm text-red-400"></p>
+      <div class="flex gap-3 pt-1">
+        <button onclick="hideM('dishModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+        <button onclick="saveDish()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -536,12 +652,19 @@
     ['overview', 'fa-chart-line',   'Tổng quan'],
     ['report',   'fa-file-invoice-dollar', 'Báo cáo doanh thu'],
     ['dishes',   'fa-ranking-star', 'Thống kê món'],
-    ['menu',     'fa-book-open',    'Thực đơn'],
-    ['staff',    'fa-users',        'Nhân viên'],
     ['booking',  'fa-calendar-check', 'Đặt bàn'],
-    ['tables',   'fa-chair',        'Bàn'],
-    ['packages', 'fa-tags',         'Gói buffet']
+    ['edit',     'fa-pen-to-square', 'Chỉnh sửa'],
+    ['settings', 'fa-sliders',      'Cấu hình'],
+    ['audit',    'fa-clock-rotate-left', 'Nhật ký']
   ];
+  // Mục "Chỉnh sửa" gồm 4 mục con (mỗi mục con là 1 khối v-xxx riêng bên dưới)
+  const EDIT_SUBS = [
+    ['menu',     'fa-book-open', 'Thực đơn'],
+    ['staff',    'fa-users',     'Nhân viên'],
+    ['tables',   'fa-chair',     'Bàn'],
+    ['packages', 'fa-tags',      'Gói buffet']
+  ];
+  let editSub = 'menu';
   const METHOD_NAME = { CASH: 'Tiền mặt', CARD: 'Thẻ', TRANSFER: 'Chuyển khoản' };
 
   let tab = 'overview';
@@ -665,18 +788,35 @@
         <i class="fa-solid ${x[1]} mr-2"></i>${x[2]}
       </button>`).join('');
 
-    TABS.forEach(x => document.getElementById('v-' + x[0]).classList.toggle('hidden', tab !== x[0]));
+    // thanh mục con của "Chỉnh sửa"
+    const nav = document.getElementById('editNav');
+    nav.classList.toggle('hidden', tab !== 'edit');
+    nav.innerHTML = EDIT_SUBS.map(x => `
+      <button data-s="${x[0]}" onclick="setEditSub(this.dataset.s)"
+        class="chip ${editSub === x[0] ? 'active' : ''} px-4 py-2 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500 transition">
+        <i class="fa-solid ${x[1]} mr-2"></i>${x[2]}
+      </button>`).join('');
+
+    const show = tab === 'edit' ? editSub : tab;          // khối nội dung đang hiện
+    [...TABS.map(x => x[0]), ...EDIT_SUBS.map(x => x[0])].forEach(id => {
+      const el = document.getElementById('v-' + id);
+      if (el) el.classList.toggle('hidden', id !== show);
+    });
     document.getElementById('rangeBar').classList.toggle('hidden', !(tab === 'report' || tab === 'dishes'));
 
-    if (tab === 'overview') loadOverview();
-    if (tab === 'report')   loadReport();
-    if (tab === 'dishes')   loadDishes();
-    if (tab === 'menu')     loadMenu();
-    if (tab === 'staff')    loadStaff();
-    if (tab === 'booking')  loadBooking();
-    if (tab === 'tables')   loadTables();
-    if (tab === 'packages') loadPackages();
+    if (show === 'overview') loadOverview();
+    if (show === 'report')   loadReport();
+    if (show === 'dishes')   loadDishes();
+    if (show === 'menu')     loadMenu();
+    if (show === 'staff')    loadStaff();
+    if (show === 'booking')  loadBooking();
+    if (show === 'tables')   loadTables();
+    if (show === 'packages') loadPackages();
+    if (show === 'settings') loadSettings();
+    if (show === 'audit')    loadAudit();
   }
+
+  function setEditSub(sub) { editSub = sub; setTab('edit'); }
 
 
   // ============ KHOẢNG NGÀY ============
@@ -771,6 +911,20 @@
         <td class="px-4 py-3 text-right font-black text-amber-400">${money(i.total)}</td>
       </tr>`).join('') ||
       '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">Không có hoá đơn trong khoảng này.</td></tr>';
+
+    const vd = r.voided || [];
+    document.getElementById('rpVoidBox').classList.toggle('hidden', !vd.length);
+    document.getElementById('rpVoidCount').textContent = vd.length + ' hoá đơn';
+    document.getElementById('rpVoided').innerHTML = vd.map(v => `
+      <tr data-id="${v.id}" onclick="openInv(Number(this.dataset.id))" class="border-t border-slate-800 hover:bg-slate-800/60 cursor-pointer">
+        <td class="px-4 py-3 text-slate-400">#${v.id}</td>
+        <td class="px-4 py-3 font-bold">${esc(v.table_id)}</td>
+        <td class="px-4 py-3 text-slate-400">${esc(v.paid_time)}</td>
+        <td class="px-4 py-3 text-red-300">${esc(v.void_reason || '')}</td>
+        <td class="px-4 py-3 text-right font-black text-slate-500 line-through">${money(v.total)}</td>
+      </tr>`).join('');
+    document.getElementById('printTitle').textContent =
+      'BÁO CÁO DOANH THU GYU SACHI · ' + r.from.split('-').reverse().join('/') + ' – ' + r.to.split('-').reverse().join('/');
   }
 
   async function openInv(id) {
@@ -793,11 +947,65 @@
             <span class="text-2xl font-black text-amber-400">${money(o.total)}</span></div>`;
     if (o.promo_note) h += `<p class="text-xs text-slate-500 pt-2"><i class="fa-solid fa-gift mr-1"></i>${esc(o.promo_note)}</p>`;
 
-    document.getElementById('invTitle').textContent = '#' + o.id;
+    if (o.paid_at) h += voidHtml(o);
+    curInv = o;
+    document.getElementById('invTitle').textContent = '#' + o.id + (o.voided ? ' · ĐÃ HUỶ' : '');
     document.getElementById('invBody').innerHTML = h;
     document.getElementById('invModal').classList.remove('hidden');
   }
   function closeInv() { document.getElementById('invModal').classList.add('hidden'); }
+
+  // ---- huỷ / khôi phục hoá đơn ----
+  let curInv = null;
+  function voidHtml(o) {
+    if (o.voided) return `
+      <div class="mt-3 p-3 rounded-xl bg-red-950/60 border border-red-800 text-xs">
+        <p class="font-black text-red-300 uppercase tracking-widest">Đã huỷ lúc ${esc(o.voided_time)}</p>
+        <p class="text-red-200 mt-1">Lí do: ${esc(o.void_reason || '')}</p>
+        <p class="text-slate-400 mt-1">Hoá đơn này không tính vào doanh thu.</p>
+      </div>
+      <button onclick="doRestore()" class="mt-3 w-full py-2.5 rounded-xl border border-emerald-700 text-emerald-300 font-bold text-sm hover:bg-emerald-700 hover:text-white transition">
+        KHÔI PHỤC HOÁ ĐƠN</button>`;
+    return `
+      <div class="pt-3 mt-3 border-t border-slate-800">
+        <button id="voidBtn" onclick="showVoid()" class="w-full py-2.5 rounded-xl border border-red-700 text-red-300 font-bold text-sm hover:bg-red-700 hover:text-white transition">
+          <i class="fa-solid fa-ban mr-2"></i>HUỶ HOÁ ĐƠN</button>
+        <div id="voidBox" class="hidden space-y-2 mt-2">
+          <input id="voidReason" maxlength="300" class="fld" placeholder="Lí do huỷ (VD: thu ngân bấm nhầm)"
+            onkeydown="if(event.key==='Enter') doVoid()">
+          <p id="voidErr" class="hidden text-sm text-red-400"></p>
+          <button onclick="doVoid()" class="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-500 font-black text-sm">XÁC NHẬN HUỶ</button>
+          <p class="text-[11px] text-slate-500">Hoá đơn không bị xoá, chỉ loại khỏi doanh thu. Có thể khôi phục lại sau.</p>
+        </div>
+      </div>`;
+  }
+  function showVoid() {
+    document.getElementById('voidBtn').classList.add('hidden');
+    document.getElementById('voidBox').classList.remove('hidden');
+    document.getElementById('voidReason').focus();
+  }
+  async function doVoid() {
+    const r = await api('/api/manager/invoice/' + curInv.id + '/void', { reason: document.getElementById('voidReason').value });
+    if (!r.success) { formErr('voidErr', r.message || 'Không huỷ được'); return; }
+    closeInv(); toast('Đã huỷ hoá đơn #' + curInv.id, true); refreshAfterInvoice();
+  }
+  async function doRestore() {
+    if (!confirm('Khôi phục hoá đơn #' + curInv.id + '? Hoá đơn sẽ được tính lại vào doanh thu.')) return;
+    const r = await api('/api/manager/invoice/' + curInv.id + '/restore', {});
+    if (!r.success) { toast(r.message || 'Không khôi phục được', false); return; }
+    closeInv(); toast('Đã khôi phục hoá đơn #' + curInv.id, true); refreshAfterInvoice();
+  }
+  function refreshAfterInvoice() {
+    if (tab === 'report') loadReport();
+    if (tab === 'overview') loadOverview();
+  }
+
+  // ---- xuất file / in ----
+  function exportCsv() {
+    const kind = tab === 'dishes' ? 'dishes' : 'invoices';
+    location.href = '/api/manager/export?kind=' + kind + '&from=' + range.from + '&to=' + range.to;
+  }
+  function printReport() { window.print(); }
 
 
   // ============ 3. THỐNG KÊ MÓN ============
@@ -815,6 +1023,8 @@
     document.getElementById('dsCat').innerHTML = barList(
       r.by_category.map(x => ({ name: x.name, value: x.revenue, text: money(x.revenue) })), 'bg-sky-500');
 
+    document.getElementById('printTitle').textContent =
+      'THỐNG KÊ MÓN GYU SACHI · ' + r.from.split('-').reverse().join('/') + ' – ' + r.to.split('-').reverse().join('/');
     document.getElementById('dsCancelTotal').textContent = r.cancelled_total ? '(' + r.cancelled_total + ' phần)' : '';
     document.getElementById('dsCancel').innerHTML = barList(
       r.cancelled.map(x => ({ name: x.name, value: x.qty, text: '×' + x.qty })), 'bg-slate-500');
@@ -849,8 +1059,8 @@
       ? 'Đổi giá chỉ áp dụng cho món gọi từ lúc này, hoá đơn cũ giữ nguyên giá. Món tắt sẽ không hiện ở màn hình gọi món của phục vụ.'
       : 'Món buffet không có giá riêng. Tắt món khi hết nguyên liệu, món sẽ biến mất khỏi mọi gói buffet.';
     document.getElementById('mHead').innerHTML = t === 'ala'
-      ? '<tr><th class="text-left px-4 py-3">Món</th><th class="text-left px-4 py-3">Nhóm</th><th class="text-right px-4 py-3">Giá (đ)</th><th class="text-center px-4 py-3">Trạng thái</th></tr>'
-      : '<tr><th class="text-left px-4 py-3">Món</th><th class="text-left px-4 py-3">Nhóm</th><th class="text-left px-4 py-3">Từ gói</th><th class="text-center px-4 py-3">Trạng thái</th></tr>';
+      ? '<tr><th class="text-left px-4 py-3">Món</th><th class="text-left px-4 py-3">Nhóm</th><th class="text-right px-4 py-3">Giá (đ)</th><th class="text-center px-4 py-3">Trạng thái</th><th class="text-right px-4 py-3">Thao tác</th></tr>'
+      : '<tr><th class="text-left px-4 py-3">Món</th><th class="text-left px-4 py-3">Nhóm</th><th class="text-left px-4 py-3">Từ gói</th><th class="text-center px-4 py-3">Trạng thái</th><th class="text-right px-4 py-3">Thao tác</th></tr>';
     renderMenu();
   }
 
@@ -886,8 +1096,11 @@
             ${x.is_active ? 'Đang bán' : 'Hết hàng'}
           </button>
         </td>
+        <td class="px-4 py-2.5 text-right whitespace-nowrap space-x-1">
+          ${btn('Sửa', B_GRAY, 'openDish', x.id)}${btn('Xoá', B_RED, 'delDish', x.id)}
+        </td>
       </tr>`).join('') ||
-      '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Không có món nào.</td></tr>';
+      '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">Không có món nào.</td></tr>';
 
     document.getElementById('mCount').textContent = rows.length + ' món';
   }
@@ -1458,6 +1671,171 @@
     if (!r.success) { toast(r.message || 'Không đổi được', false); return; }
     toast(p.is_active ? 'Đã tắt ' + p.name : 'Đã bật ' + p.name, true);
     loadPackages();
+  }
+
+
+  // ============ SỬA / XOÁ MÓN ============
+  let editDish = null;
+
+  function dishCats(ala) {
+    const order = MENU.category_order;
+    return [...new Set((ala ? MENU.alacarte : MENU.buffet).map(x => x.category).filter(Boolean))].sort((a, b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+  }
+
+  function openDish(id) {
+    const ala = menuTab === 'ala';
+    const item = (ala ? MENU.alacarte : MENU.buffet).find(x => x.id === Number(id));
+    if (!item) return;
+    editDish = { ala: ala, item: item };
+    document.getElementById('dmTitle').textContent = (ala ? 'Sửa món gọi lẻ' : 'Sửa món buffet');
+    document.getElementById('dmName').value = item.name;
+    document.getElementById('dmCat').innerHTML =
+      dishCats(ala).map(c => `<option value="${esc(c)}" ${c === item.category ? 'selected' : ''}>${esc(c)}</option>`).join('') +
+      '<option value="__new__">+ Nhóm mới...</option>';
+    document.getElementById('dmCatNew').value = '';
+    onDmCat();
+    const st = document.getElementById('dmStation');
+    st.innerHTML = MENU.stations.map(s => `<option value="${esc(s.id)}" ${s.id === item.station ? 'selected' : ''}>${esc(s.id)} · ${esc(s.name)}</option>`).join('');
+    const combo = ala && item.is_combo;
+    st.disabled = combo;
+    document.getElementById('dmComboNote').classList.toggle('hidden', !combo);
+    formErr('dmErr', '');
+    showM('dishModal');
+    document.getElementById('dmName').focus();
+  }
+
+  function onDmCat() {
+    document.getElementById('dmCatNew').classList.toggle('hidden', document.getElementById('dmCat').value !== '__new__');
+  }
+
+  async function reloadMenuKeepSearch() {
+    const q = document.getElementById('mSearch').value;
+    await loadMenu();
+    document.getElementById('mSearch').value = q;
+    renderMenu();
+  }
+
+  async function saveDish() {
+    const d = editDish; if (!d) return;
+    let cat = document.getElementById('dmCat').value;
+    if (cat === '__new__') cat = document.getElementById('dmCatNew').value;
+    const body = { name: document.getElementById('dmName').value };
+    if ((cat || '') !== (d.item.category || '')) body.category = cat;          // chỉ gửi khi có đổi
+    const st = document.getElementById('dmStation');
+    if (!st.disabled && st.value !== d.item.station) body[d.ala ? 'station_code' : 'station_id'] = st.value;
+
+    const r = await api((d.ala ? '/api/manager/alacarte/' : '/api/manager/menu-item/') + d.item.id, body);
+    if (!r.success) { formErr('dmErr', r.message || 'Không lưu được'); return; }
+    hideM('dishModal');
+    toast('Đã lưu món', true);
+    reloadMenuKeepSearch();
+  }
+
+  async function delDish(id) {
+    const ala = menuTab === 'ala';
+    const item = (ala ? MENU.alacarte : MENU.buffet).find(x => x.id === Number(id));
+    if (!item) return;
+    if (!confirm('Xoá hẳn món “' + item.name + '”?\nChỉ xoá được món chưa từng được gọi. Món đã bán thì hãy bấm TẮT.')) return;
+    const r = await api((ala ? '/api/manager/alacarte/' : '/api/manager/menu-item/') + item.id + '/delete', {});
+    if (!r.success) { toast(r.message || 'Không xoá được', false); return; }
+    toast('Đã xoá món: ' + item.name, true);
+    reloadMenuKeepSearch();
+  }
+
+
+  // ============ CẤU HÌNH ============
+  let cfgDays = new Set();
+  const DAY_NAMES = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+  function holToText(h) {                          // MM-DD -> dd/mm ; YYYY-MM-DD -> dd/mm/yyyy
+    let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(h);
+    if (m) return m[3] + '/' + m[2] + '/' + m[1];
+    m = /^(\d{2})-(\d{2})$/.exec(h);
+    return m ? m[2] + '/' + m[1] : h;
+  }
+  function holFromText(t) {                        // dd/mm -> MM-DD ; dd/mm/yyyy -> YYYY-MM-DD
+    t = t.trim();
+    let m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t);
+    if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+    m = /^(\d{1,2})\/(\d{1,2})$/.exec(t);
+    if (m) return m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+    return t;                                      // sai định dạng -> để máy chủ báo lỗi
+  }
+
+  function fillSettings(c) {
+    document.getElementById('cfVat').value = c.vat_percent;
+    document.getElementById('cfLunch').value = c.lunch_end_hour;
+    document.getElementById('cfGroup').value = c.group_size;
+    document.getElementById('cfHol').value = c.holidays.map(holToText).join('\n');
+    cfgDays = new Set(c.dinner_days);
+    renderCfgDays();
+    cfgExample();
+  }
+  async function loadSettings() {
+    const r = await api('/api/manager/settings');
+    if (!r.settings) return;
+    formErr('cfErr', '');
+    fillSettings(r.settings);
+  }
+  function renderCfgDays() {
+    document.getElementById('cfDays').innerHTML = DAY_NAMES.map((n, i) => `
+      <button type="button" data-d="${i}" onclick="toggleCfgDay(Number(this.dataset.d))"
+        class="chip ${cfgDays.has(i) ? 'active' : ''} px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-950 text-xs font-bold hover:border-red-500 transition">${n}</button>`).join('');
+  }
+  function toggleCfgDay(i) {
+    if (cfgDays.has(i)) cfgDays.delete(i); else cfgDays.add(i);
+    renderCfgDays();
+  }
+  function cfgExample() {
+    const g = Number(document.getElementById('cfGroup').value) || 4;
+    const h = document.getElementById('cfLunch').value || 15;
+    const v = document.getElementById('cfVat').value || 0;
+    document.getElementById('cfExample').innerHTML =
+      `<i class="fa-solid fa-lightbulb mr-2"></i>Nhóm ${g} khách được miễn 1 suất buffet · bàn mở trước ${h}:00 là buổi trưa · VAT ${v}% tính sau khi trừ ưu đãi.`;
+  }
+  async function saveSettings() {
+    const body = {
+      vat_percent: document.getElementById('cfVat').value,
+      lunch_end_hour: document.getElementById('cfLunch').value,
+      group_size: document.getElementById('cfGroup').value,
+      dinner_days: [...cfgDays],
+      holidays: document.getElementById('cfHol').value.split(/[\n,;]+/).map(x => x.trim()).filter(Boolean).map(holFromText)
+    };
+    const r = await api('/api/manager/settings', body);
+    if (!r.success) { formErr('cfErr', r.message || 'Không lưu được'); return; }
+    formErr('cfErr', '');
+    fillSettings(r.settings);
+    toast('Đã lưu cấu hình', true);
+  }
+  async function resetSettings() {
+    if (!confirm('Khôi phục VAT, giờ trưa, ưu đãi nhóm và ngày lễ về mặc định?')) return;
+    const r = await api('/api/manager/settings', { reset: true });
+    if (!r.success) { formErr('cfErr', r.message || 'Không khôi phục được'); return; }
+    formErr('cfErr', '');
+    fillSettings(r.settings);
+    toast('Đã khôi phục mặc định', true);
+  }
+
+
+  // ============ NHẬT KÝ ============
+  let auTimer = null;
+  async function loadAudit() {
+    const q = document.getElementById('auSearch').value.trim();
+    const r = await api('/api/manager/audit?q=' + encodeURIComponent(q));
+    if (!r.logs) return;
+    document.getElementById('auBody').innerHTML = r.logs.map(l => `
+      <tr class="border-t border-slate-800 align-top">
+        <td class="px-4 py-2.5 text-slate-400 whitespace-nowrap">${esc(l.at)}</td>
+        <td class="px-4 py-2.5 font-bold ${/Huỷ|Xoá/.test(l.action) ? 'text-red-300' : 'text-slate-100'}">${esc(l.action)}</td>
+        <td class="px-4 py-2.5">${esc(l.target)}</td>
+        <td class="px-4 py-2.5 text-slate-400">${esc(l.detail)}</td>
+      </tr>`).join('') ||
+      '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Chưa có thao tác nào được ghi.</td></tr>';
+    document.getElementById('auCount').textContent =
+      r.logs.length + ' thao tác gần nhất' + (r.logs.length >= 200 ? ' (hiển thị 200 mới nhất, dùng ô tìm kiếm để lọc)' : '');
   }
 
 

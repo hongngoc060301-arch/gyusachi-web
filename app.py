@@ -1,8 +1,11 @@
+import csv
+import io
 import re
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, Response, g
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from db import query, transaction
@@ -705,8 +708,57 @@ HOLIDAYS_YEARLY = {'01-01', '04-30', '05-01', '09-02', '12-24', '12-25'}
 HOLIDAYS_ONCE = {f'2027-02-{d:02d}' for d in range(5, 12)}      # Tết Đinh Mùi 2027 (30 Tết - mùng 5)
 
 
+# ---------- Cấu hình chỉnh được ở trang Quản lí (lưu trong bảng app_settings, khoá bắt đầu bằng cfg_) ----------
+# Các hằng số phía trên chỉ là GIÁ TRỊ MẶC ĐỊNH; quản lí đổi ở tab "Cấu hình" thì dùng giá trị trong database.
+
+SETTING_KEYS = ('cfg_vat_percent', 'cfg_lunch_end_hour', 'cfg_group_size', 'cfg_dinner_days', 'cfg_holidays')
+_SETTINGS_CACHE = {'at': 0.0, 'val': None}
+
+
+def default_settings():
+    return {"vat_percent": VAT_RATE * 100, "lunch_end_hour": LUNCH_END_HOUR, "group_size": GROUP_SIZE,
+            "dinner_days": [0, 1, 2, 3],                      # 0 = thứ 2 ... 6 = chủ nhật
+            "holidays": sorted(HOLIDAYS_YEARLY | HOLIDAYS_ONCE)}
+
+
+def get_settings(force=False):
+    now = time.time()
+    if not force and _SETTINGS_CACHE['val'] is not None and now - _SETTINGS_CACHE['at'] < 5:
+        return _SETTINGS_CACHE['val']
+    st = default_settings()
+    try:
+        rows = {r['key']: r['value'] for r in query(
+            "SELECT key, value FROM app_settings WHERE key = ANY(%s)", (list(SETTING_KEYS),))}
+    except Exception:
+        rows = {}                  # chưa chạy file 17 -> dùng mặc định
+    try:
+        if 'cfg_vat_percent' in rows:     st['vat_percent'] = float(rows['cfg_vat_percent'])
+        if 'cfg_lunch_end_hour' in rows:  st['lunch_end_hour'] = int(rows['cfg_lunch_end_hour'])
+        if 'cfg_group_size' in rows:      st['group_size'] = int(rows['cfg_group_size'])
+        if 'cfg_dinner_days' in rows:
+            st['dinner_days'] = sorted({int(x) for x in rows['cfg_dinner_days'].split(',') if x.strip() != ''})
+        if 'cfg_holidays' in rows:
+            st['holidays'] = sorted({x.strip() for x in rows['cfg_holidays'].split(',') if x.strip()})
+    except (TypeError, ValueError):
+        st = default_settings()    # dữ liệu hỏng -> quay về mặc định, không làm sập thu ngân
+    _SETTINGS_CACHE.update(at=now, val=st)
+    return st
+
+
+def days_label(days):
+    """[0,1,2,3] -> 'T2-T5'; [0,2,4] -> 'T2, T4, T6'."""
+    names = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
+    d = sorted(days)
+    if not d:
+        return 'không ngày nào'
+    if d == list(range(d[0], d[-1] + 1)) and len(d) > 2:
+        return f"{names[d[0]]}-{names[d[-1]]}"
+    return ', '.join(names[x] for x in d)
+
+
 def is_holiday(d):
-    return d.strftime('%m-%d') in HOLIDAYS_YEARLY or d.strftime('%Y-%m-%d') in HOLIDAYS_ONCE
+    h = set(get_settings()['holidays'])
+    return d.strftime('%m-%d') in h or d.strftime('%Y-%m-%d') in h
 
 
 def promo_auto(opened_at):
@@ -715,11 +767,13 @@ def promo_auto(opened_at):
         opened_at = datetime.fromisoformat(opened_at)
     if is_holiday(opened_at.date()):
         return False, "Ngày lễ - không áp dụng đi 4 tính 3"
-    if opened_at.hour < LUNCH_END_HOUR:
-        return True, "Buffet trưa - đi 4 tính 3"
-    if opened_at.weekday() <= 3:                         # 0 = thứ 2 ... 3 = thứ 5
-        return True, "Buffet tối T2-T5 - đi 4 tính 3"
-    return False, "Buffet tối T6-CN không áp dụng đi 4 tính 3"
+    st = get_settings()
+    promo = f"đi {st['group_size']} tính {st['group_size'] - 1}"
+    if opened_at.hour < st['lunch_end_hour']:
+        return True, f"Buffet trưa - {promo}"
+    if opened_at.weekday() in st['dinner_days']:         # 0 = thứ 2 ... 6 = chủ nhật
+        return True, f"Buffet tối {days_label(st['dinner_days'])} - {promo}"
+    return False, f"Buffet tối ngoài {days_label(st['dinner_days'])} không áp dụng {promo}"
 
 
 def compute_bill(o, items, guests=None, promo=None):
@@ -741,17 +795,19 @@ def compute_bill(o, items, guests=None, promo=None):
 
     auto_ok, auto_reason = promo_auto(o['created_at'])
     apply = auto_ok if promo is None else bool(promo)
-    free = guests // GROUP_SIZE if (apply and food_price) else 0
+    st = get_settings()
+    vat_rate = st['vat_percent'] / 100
+    free = guests // st['group_size'] if (apply and food_price) else 0
     discount = free * food_price
 
     subtotal = food_amount + drink_amount + extra_amount
     taxable = subtotal - discount
-    vat = int(round(taxable * VAT_RATE))
+    vat = int(round(taxable * vat_rate))
 
     if free:
-        note = f"{auto_reason if promo is None else 'Thu ngân áp dụng đi 4 tính 3'}: miễn phí {free} suất"
+        note = f"{auto_reason if promo is None else 'Thu ngân áp dụng ưu đãi nhóm'}: miễn phí {free} suất"
     elif promo is False:
-        note = "Thu ngân bỏ ưu đãi đi 4 tính 3"
+        note = "Thu ngân bỏ ưu đãi nhóm"
     else:
         note = auto_reason
 
@@ -762,7 +818,7 @@ def compute_bill(o, items, guests=None, promo=None):
         "lines": lines, "extra_amount": extra_amount,
         "promo_auto": auto_ok, "promo_applied": bool(free), "promo_free": free,
         "promo_note": note, "discount": discount,
-        "subtotal": subtotal, "vat_rate": VAT_RATE, "vat": vat, "total": taxable + vat,
+        "subtotal": subtotal, "vat_rate": vat_rate, "vat": vat, "total": taxable + vat,
     }
 
 
@@ -909,7 +965,7 @@ def api_cashier_history():
         SELECT o.id, o.table_id, o.guests, o.payment_method, o.total, o.discount,
                to_char(o.paid_at, 'HH24:MI') AS paid_time, COALESCE(s.name, 'Thu ngân') AS cashier
         FROM orders o LEFT JOIN staffs s ON s.id = o.cashier_id
-        WHERE o.paid_at::date = CURRENT_DATE
+        WHERE o.paid_at::date = CURRENT_DATE AND o.voided_at IS NULL
         ORDER BY o.paid_at DESC
     """)
     rows = [dict(r) for r in rows]
@@ -924,7 +980,7 @@ def api_cashier_history():
 
 MANAGER_PASSWORD = '88889999'                            # mật khẩu phân hệ quản lí
 
-PAID = "o.status = 'CLOSED' AND o.paid_at IS NOT NULL"   # điều kiện: hoá đơn đã thanh toán
+PAID = "o.status = 'CLOSED' AND o.paid_at IS NOT NULL AND o.voided_at IS NULL"   # hoá đơn đã thanh toán và chưa bị huỷ
 
 
 def manager_ok():
@@ -1060,7 +1116,7 @@ def api_manager_report():
         WHERE {PAID} AND {rng} GROUP BY pk.name, pk.price ORDER BY pk.price NULLS FIRST""", p)]
 
     by_shift = [dict(r) for r in query(f"""
-        SELECT CASE WHEN EXTRACT(HOUR FROM o.created_at) < {LUNCH_END_HOUR} THEN 'Trưa' ELSE 'Tối' END AS name,
+        SELECT CASE WHEN EXTRACT(HOUR FROM o.created_at) < {int(get_settings()['lunch_end_hour'])} THEN 'Trưa' ELSE 'Tối' END AS name,
                COALESCE(SUM(o.total), 0)::bigint AS revenue, COUNT(*)::int AS bills
         FROM orders o WHERE {PAID} AND {rng} GROUP BY 1 ORDER BY 1 DESC""", p)]
 
@@ -1070,9 +1126,17 @@ def api_manager_report():
         FROM orders o LEFT JOIN packages pk ON pk.id = o.package_id
         WHERE {PAID} AND {rng} ORDER BY o.paid_at DESC LIMIT 300""", p)]
 
+    voided = [dict(r) for r in query("""
+        SELECT o.id, o.table_id, o.total, o.void_reason,
+               to_char(o.paid_at, 'DD/MM HH24:MI') AS paid_time, to_char(o.voided_at, 'DD/MM HH24:MI') AS voided_time
+        FROM orders o
+        WHERE o.status = 'CLOSED' AND o.paid_at IS NOT NULL AND o.voided_at IS NOT NULL
+          AND o.paid_at::date BETWEEN %s AND %s
+        ORDER BY o.voided_at DESC LIMIT 100""", p)]
+
     return jsonify({"from": d_from, "to": d_to, "summary": s, "by_method": by_method,
                     "by_package": by_package, "by_shift": by_shift,
-                    "series": daily_series(d_from, d_to), "invoices": invoices})
+                    "series": daily_series(d_from, d_to), "invoices": invoices, "voided": voided})
 
 
 @app.route('/api/manager/invoice/<int:order_id>')
@@ -1082,6 +1146,8 @@ def api_manager_invoice(order_id):
                to_char(o.created_at, 'DD/MM HH24:MI') AS opened_at,
                to_char(o.paid_at, 'DD/MM HH24:MI') AS paid_at,
                o.food_amount, o.drink_amount, o.extra_amount, o.discount, o.vat_amount, o.total,
+               (o.voided_at IS NOT NULL) AS voided, o.void_reason,
+               to_char(o.voided_at, 'DD/MM HH24:MI') AS voided_time,
                pk.name AS package_name, pk.price AS package_price,
                dk.name AS drink_name,   dk.price AS drink_price
         FROM orders o
@@ -1150,11 +1216,11 @@ def api_manager_dishes():
 @app.route('/api/manager/menu')
 def api_manager_menu():
     ala = query("""
-        SELECT a.id, a.name, a.category, a.price::int AS price, a.is_active,
+        SELECT a.id, a.name, a.category, a.station_code AS station, a.price::int AS price, a.is_active,
                EXISTS (SELECT 1 FROM combo_details c WHERE c.combo_id = a.id) AS is_combo
         FROM alacarte_items a ORDER BY a.id""")
     buffet = query("""
-        SELECT m.id, m.name, m.category, m.is_active, MIN(p.price)::int AS from_price
+        SELECT m.id, m.name, m.category, m.station_id AS station, m.is_active, MIN(p.price)::int AS from_price
         FROM menu_items m
         LEFT JOIN package_items pi ON pi.menu_item_id = m.id
         LEFT JOIN packages p ON p.id = pi.package_id
@@ -1243,45 +1309,399 @@ def api_manager_menu_item_new():
     return jsonify({"success": True, "id": new_id})
 
 
+# ---------- Nhật ký thao tác ----------
+
+def vnd(n):
+    return f"{int(n):,}đ".replace(',', '.')
+
+
+def audit(action, target='', detail=''):
+    """Ghi nhật ký. Lỗi ghi nhật ký (VD chưa chạy file 18) không bao giờ làm hỏng thao tác chính."""
+    g.audited = True
+    try:
+        with transaction() as cur:
+            cur.execute("INSERT INTO audit_log (actor, action, target, detail) VALUES ('Quản lí', %s, %s, %s)",
+                        (str(action)[:100], str(target)[:200], str(detail)[:500]))
+    except Exception:
+        pass
+
+
+# ---------- Sửa / xoá món ----------
+
 @app.route('/api/manager/alacarte/<int:item_id>', methods=['POST'])
 def api_manager_alacarte(item_id):
     data = request.get_json() or {}
-    sets, params = [], []
+    changes = []
+    try:
+        with transaction() as cur:
+            cur.execute("""SELECT a.id, a.name, a.category, a.station_code, a.price::int AS price, a.is_active,
+                                  EXISTS (SELECT 1 FROM combo_details c WHERE c.combo_id = a.id) AS is_combo
+                           FROM alacarte_items a WHERE a.id = %s FOR UPDATE""", (item_id,))
+            old = cur.fetchone()
+            if not old:
+                raise OrderError("Không tìm thấy món.")
+            sets, params = [], []
 
-    if 'price' in data:
-        try:
-            price = int(data['price'])
-        except (TypeError, ValueError):
-            return fail("Giá không hợp lệ.")
-        if not 0 <= price <= 10_000_000:
-            return fail("Giá phải từ 0 đến 10.000.000đ.")
-        sets.append("price = %s"); params.append(price)
+            if 'name' in data:
+                name = clean_name(data['name'], 255)
+                if name != old['name']:
+                    cur.execute("SELECT 1 FROM alacarte_items WHERE LOWER(name) = LOWER(%s) AND id <> %s", (name, item_id))
+                    if cur.fetchone():
+                        raise OrderError("Đã có món gọi lẻ tên này.")
+                    sets.append("name = %s"); params.append(name)
+                    changes.append(f"tên “{old['name']}” → “{name}”")
 
-    if 'is_active' in data:
-        sets.append("is_active = %s"); params.append(bool(data['is_active']))
+            if 'category' in data:
+                cat = clean_name(data['category'], 100)
+                if cat != old['category']:
+                    sets.append("category = %s"); params.append(cat)
+                    changes.append(f"nhóm {old['category']} → {cat}")
 
-    if not sets:
-        return fail("Không có gì để cập nhật.")
+            if 'station_code' in data and data['station_code'] != old['station_code']:
+                if old['is_combo']:
+                    raise OrderError("Combo gồm nhiều món con nên không đổi trạm bếp được.")
+                cur.execute("SELECT id FROM stations WHERE id = %s", (data['station_code'],))
+                if not cur.fetchone():
+                    raise OrderError("Trạm bếp không hợp lệ.")
+                sets.append("station_code = %s"); params.append(data['station_code'])
+                changes.append(f"trạm {old['station_code']} → {data['station_code']}")
 
+            if 'price' in data:
+                try:
+                    price = int(data['price'])
+                except (TypeError, ValueError):
+                    raise OrderError("Giá không hợp lệ.")
+                if not 0 <= price <= 10_000_000:
+                    raise OrderError("Giá phải từ 0 đến 10.000.000đ.")
+                if price != old['price']:
+                    sets.append("price = %s"); params.append(price)
+                    changes.append(f"giá {vnd(old['price'])} → {vnd(price)}")
+
+            if 'is_active' in data and bool(data['is_active']) != old['is_active']:
+                sets.append("is_active = %s"); params.append(bool(data['is_active']))
+                changes.append("bán lại" if data['is_active'] else "tắt (hết hàng)")
+
+            if not sets:
+                if changes or any(k in data for k in ('name', 'category', 'station_code', 'price', 'is_active')):
+                    return jsonify({"success": True})       # không có gì thay đổi
+                raise OrderError("Không có gì để cập nhật.")
+            cur.execute(f"UPDATE alacarte_items SET {', '.join(sets)} WHERE id = %s", (*params, item_id))
+    except OrderError as e:
+        return fail(str(e))
+    audit('Sửa món gọi lẻ', old['name'], '; '.join(changes))
+    return jsonify({"success": True})
+
+
+@app.route('/api/manager/alacarte/<int:item_id>/delete', methods=['POST'])
+def api_manager_alacarte_delete(item_id):
     with transaction() as cur:
-        cur.execute(f"UPDATE alacarte_items SET {', '.join(sets)} WHERE id = %s RETURNING id",
-                    (*params, item_id))
-        if not cur.fetchone():
+        cur.execute("SELECT id, name FROM alacarte_items WHERE id = %s FOR UPDATE", (item_id,))
+        a = cur.fetchone()
+        if not a:
             return fail("Không tìm thấy món.", 404)
+        cur.execute("SELECT 1 FROM order_items WHERE name = %s LIMIT 1", (a['name'],))
+        if cur.fetchone():
+            return fail("Món này đã có lịch sử gọi nên không xoá được (xoá sẽ làm sai báo cáo). Hãy bấm TẮT để ẩn món.")
+        cur.execute("DELETE FROM alacarte_items WHERE id = %s", (item_id,))      # combo_details tự xoá theo
+    audit('Xoá món gọi lẻ', a['name'])
     return jsonify({"success": True})
 
 
 @app.route('/api/manager/menu-item/<int:item_id>', methods=['POST'])
 def api_manager_menu_item(item_id):
     data = request.get_json() or {}
-    if 'is_active' not in data:
-        return fail("Không có gì để cập nhật.")
-    with transaction() as cur:
-        cur.execute("UPDATE menu_items SET is_active = %s WHERE id = %s RETURNING id",
-                    (bool(data['is_active']), item_id))
-        if not cur.fetchone():
-            return fail("Không tìm thấy món.", 404)
+    changes = []
+    try:
+        with transaction() as cur:
+            cur.execute("SELECT id, name, category, station_id, is_active FROM menu_items WHERE id = %s FOR UPDATE",
+                        (item_id,))
+            old = cur.fetchone()
+            if not old:
+                raise OrderError("Không tìm thấy món.")
+            sets, params = [], []
+
+            if 'name' in data:
+                name = clean_name(data['name'], 150)
+                if name != old['name']:
+                    cur.execute("SELECT 1 FROM menu_items WHERE LOWER(name) = LOWER(%s) AND id <> %s", (name, item_id))
+                    if cur.fetchone():
+                        raise OrderError("Đã có món buffet tên này.")
+                    sets.append("name = %s"); params.append(name)
+                    changes.append(f"tên “{old['name']}” → “{name}”")
+
+            if 'category' in data:
+                cat = clean_name(data['category'], 100)
+                if cat != old['category']:
+                    sets.append("category = %s"); params.append(cat)
+                    changes.append(f"nhóm {old['category']} → {cat}")
+
+            if 'station_id' in data and data['station_id'] != old['station_id']:
+                cur.execute("SELECT id FROM stations WHERE id = %s", (data['station_id'],))
+                if not cur.fetchone():
+                    raise OrderError("Trạm bếp không hợp lệ.")
+                sets.append("station_id = %s"); params.append(data['station_id'])
+                changes.append(f"trạm {old['station_id']} → {data['station_id']}")
+
+            if 'is_active' in data and bool(data['is_active']) != old['is_active']:
+                sets.append("is_active = %s"); params.append(bool(data['is_active']))
+                changes.append("bán lại" if data['is_active'] else "tắt (hết nguyên liệu)")
+
+            if not sets:
+                if any(k in data for k in ('name', 'category', 'station_id', 'is_active')):
+                    return jsonify({"success": True})
+                raise OrderError("Không có gì để cập nhật.")
+            cur.execute(f"UPDATE menu_items SET {', '.join(sets)} WHERE id = %s", (*params, item_id))
+    except OrderError as e:
+        return fail(str(e))
+    audit('Sửa món buffet', old['name'], '; '.join(changes))
     return jsonify({"success": True})
+
+
+@app.route('/api/manager/menu-item/<int:item_id>/delete', methods=['POST'])
+def api_manager_menu_item_delete(item_id):
+    with transaction() as cur:
+        cur.execute("SELECT id, name FROM menu_items WHERE id = %s FOR UPDATE", (item_id,))
+        m = cur.fetchone()
+        if not m:
+            return fail("Không tìm thấy món.", 404)
+        cur.execute("SELECT 1 FROM order_items WHERE menu_item_id = %s LIMIT 1", (item_id,))
+        if cur.fetchone():
+            return fail("Món này đã có lịch sử gọi nên không xoá được (xoá sẽ làm sai báo cáo). Hãy bấm TẮT để ẩn món.")
+        cur.execute("DELETE FROM menu_items WHERE id = %s", (item_id,))          # package_items tự xoá theo
+    audit('Xoá món buffet', m['name'])
+    return jsonify({"success": True})
+
+
+# ---------- Huỷ / khôi phục hoá đơn ----------
+
+@app.route('/api/manager/invoice/<int:order_id>/void', methods=['POST'])
+def api_manager_invoice_void(order_id):
+    reason = ' '.join(str((request.get_json() or {}).get('reason') or '').split())[:300]
+    if len(reason) < 3:
+        return fail("Hãy nhập lí do huỷ hoá đơn (ít nhất 3 ký tự).")
+    with transaction() as cur:
+        cur.execute("SELECT id, table_id, total, status, paid_at, voided_at FROM orders WHERE id = %s FOR UPDATE",
+                    (order_id,))
+        o = cur.fetchone()
+        if not o:
+            return fail("Không tìm thấy hoá đơn.", 404)
+        if o['status'] != 'CLOSED' or not o['paid_at']:
+            return fail("Hoá đơn này chưa thanh toán.")
+        if o['voided_at']:
+            return fail("Hoá đơn này đã được huỷ rồi.")
+        cur.execute("UPDATE orders SET voided_at = NOW(), void_reason = %s WHERE id = %s", (reason, order_id))
+    audit('Huỷ hoá đơn', f"#{order_id} · bàn {o['table_id']}", f"{vnd(o['total'] or 0)} · lí do: {reason}")
+    return jsonify({"success": True})
+
+
+@app.route('/api/manager/invoice/<int:order_id>/restore', methods=['POST'])
+def api_manager_invoice_restore(order_id):
+    with transaction() as cur:
+        cur.execute("SELECT id, table_id, total, voided_at FROM orders WHERE id = %s FOR UPDATE", (order_id,))
+        o = cur.fetchone()
+        if not o:
+            return fail("Không tìm thấy hoá đơn.", 404)
+        if not o['voided_at']:
+            return fail("Hoá đơn này chưa bị huỷ.")
+        cur.execute("UPDATE orders SET voided_at = NULL, void_reason = NULL WHERE id = %s", (order_id,))
+    audit('Khôi phục hoá đơn', f"#{order_id} · bàn {o['table_id']}", vnd(o['total'] or 0))
+    return jsonify({"success": True})
+
+
+# ---------- Xuất báo cáo (CSV mở bằng Excel) ----------
+
+@app.route('/api/manager/export')
+def api_manager_export():
+    kind = request.args.get('kind', 'invoices')
+    d_from, d_to = date_range()
+    p = (d_from, d_to)
+    buf = io.StringIO()
+    buf.write('sep=;\r\n')                       # để Excel (cả máy cài tiếng Việt) tự chia cột
+    w = csv.writer(buf, delimiter=';')
+
+    if kind == 'invoices':
+        w.writerow(['Mã HĐ', 'Ngày giờ thanh toán', 'Bàn', 'Gói buffet', 'Số khách', 'Tiền buffet đồ ăn',
+                    'Tiền buffet nước', 'Gọi lẻ / combo', 'Giảm giá', 'VAT', 'Tổng thanh toán',
+                    'Hình thức', 'Ưu đãi', 'Trạng thái', 'Lí do huỷ'])
+        rows = query("""
+            SELECT o.id, to_char(o.paid_at, 'DD/MM/YYYY HH24:MI') AS paid, o.table_id,
+                   COALESCE(pk.name, 'Chỉ gọi lẻ') AS package, o.guests, o.food_amount, o.drink_amount,
+                   o.extra_amount, o.discount, o.vat_amount, o.total, o.payment_method, o.promo_note,
+                   (o.voided_at IS NOT NULL) AS voided, o.void_reason
+            FROM orders o LEFT JOIN packages pk ON pk.id = o.package_id
+            WHERE o.status = 'CLOSED' AND o.paid_at IS NOT NULL AND o.paid_at::date BETWEEN %s AND %s
+            ORDER BY o.paid_at""", p)
+        methods = {'CASH': 'Tiền mặt', 'CARD': 'Thẻ', 'TRANSFER': 'Chuyển khoản'}
+        for r in rows:
+            w.writerow([r['id'], r['paid'], r['table_id'], r['package'], r['guests'], r['food_amount'] or 0,
+                        r['drink_amount'] or 0, r['extra_amount'] or 0, r['discount'] or 0, r['vat_amount'] or 0,
+                        r['total'] or 0, methods.get(r['payment_method'], r['payment_method'] or ''),
+                        r['promo_note'] or '', 'Đã huỷ' if r['voided'] else 'Đã thanh toán', r['void_reason'] or ''])
+    elif kind == 'dishes':
+        w.writerow(['Món', 'Nhóm', 'Loại', 'Số lượng', 'Doanh thu'])
+        base = f"""FROM order_items oi JOIN orders o ON o.id = oi.order_id
+                   WHERE {PAID} AND o.paid_at::date BETWEEN %s AND %s AND oi.status <> 'CANCELLED'"""
+        for r in query(f"""SELECT oi.name, SUM(oi.qty)::int AS qty {base} AND oi.kind = 'PACKAGE'
+                           GROUP BY oi.name ORDER BY qty DESC, oi.name""", p):
+            w.writerow([r['name'], '', 'Món trong buffet', r['qty'], 0])
+        for r in query(f"""SELECT oi.name, COALESCE(MAX(a.category), '') AS category, SUM(oi.qty)::int AS qty,
+                                  SUM(oi.qty * oi.unit_price)::bigint AS revenue
+                           {base} AND oi.parent_id IS NULL AND oi.kind IN ('ALACARTE', 'COMBO')
+                           GROUP BY oi.name ORDER BY revenue DESC, oi.name""".replace(
+                "FROM order_items oi JOIN orders o ON o.id = oi.order_id",
+                "FROM order_items oi JOIN orders o ON o.id = oi.order_id LEFT JOIN alacarte_items a ON a.name = oi.name"), p):
+            w.writerow([r['name'], r['category'], 'Gọi lẻ / combo', r['qty'], r['revenue']])
+    else:
+        return fail("Loại báo cáo không hợp lệ.")
+
+    audit('Xuất báo cáo', 'Hoá đơn' if kind == 'invoices' else 'Thống kê món', f"{d_from} → {d_to}")
+    return Response('﻿' + buf.getvalue(), mimetype='text/csv; charset=utf-8',
+                    headers={"Content-Disposition": f"attachment; filename=gyusachi_{kind}_{d_from}_{d_to}.csv"})
+
+
+# ---------- Cấu hình ----------
+
+def parse_holiday(x):
+    """'MM-DD' (hằng năm) hoặc 'YYYY-MM-DD' (riêng năm đó) -> chuỗi chuẩn, hoặc báo lỗi."""
+    x = str(x).strip()
+    try:
+        if re.fullmatch(r'\d{2}-\d{2}', x):
+            datetime.strptime('2000-' + x, '%Y-%m-%d')          # 2000 là năm nhuận, cho phép 02-29
+        elif re.fullmatch(r'\d{4}-\d{2}-\d{2}', x):
+            datetime.strptime(x, '%Y-%m-%d')
+        else:
+            raise ValueError
+    except ValueError:
+        raise OrderError(f"Ngày lễ “{x}” không hợp lệ (dùng dd/mm hoặc dd/mm/yyyy).")
+    return x
+
+
+@app.route('/api/manager/settings')
+def api_manager_settings_get():
+    return jsonify({"settings": get_settings(force=True), "defaults": default_settings()})
+
+
+@app.route('/api/manager/settings', methods=['POST'])
+def api_manager_settings_save():
+    data = request.get_json() or {}
+    try:
+        if data.get('reset'):
+            new = default_settings()
+        else:
+            try:
+                vat = round(float(data.get('vat_percent')), 2)
+                lunch = int(data.get('lunch_end_hour'))
+                group = int(data.get('group_size'))
+                days = sorted({int(x) for x in (data.get('dinner_days') or [])})
+            except (TypeError, ValueError):
+                raise OrderError("Giá trị cấu hình không hợp lệ.")
+            if not 0 <= vat <= 30:
+                raise OrderError("VAT phải từ 0 đến 30%.")
+            if not 10 <= lunch <= 20:
+                raise OrderError("Giờ kết thúc buổi trưa phải từ 10 đến 20 giờ.")
+            if not 2 <= group <= 20:
+                raise OrderError("Số người trong nhóm phải từ 2 đến 20.")
+            if any(d < 0 or d > 6 for d in days):
+                raise OrderError("Ngày áp dụng buổi tối không hợp lệ.")
+            hol = sorted({parse_holiday(x) for x in (data.get('holidays') or [])})
+            if len(hol) > 300:
+                raise OrderError("Danh sách ngày lễ quá dài.")
+            new = {"vat_percent": vat, "lunch_end_hour": lunch, "group_size": group,
+                   "dinner_days": days, "holidays": hol}
+
+        old = get_settings(force=True)
+        with transaction() as cur:
+            if data.get('reset'):
+                cur.execute("DELETE FROM app_settings WHERE key = ANY(%s)", (list(SETTING_KEYS),))
+            else:
+                values = {'cfg_vat_percent': str(new['vat_percent']), 'cfg_lunch_end_hour': str(new['lunch_end_hour']),
+                          'cfg_group_size': str(new['group_size']),
+                          'cfg_dinner_days': ','.join(map(str, new['dinner_days'])),
+                          'cfg_holidays': ','.join(new['holidays'])}
+                for k, v in values.items():
+                    cur.execute("""INSERT INTO app_settings (key, value) VALUES (%s, %s)
+                                   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()""", (k, v))
+    except OrderError as e:
+        return fail(str(e))
+
+    _SETTINGS_CACHE['val'] = None
+    ch = []
+    if old['vat_percent'] != new['vat_percent']:     ch.append(f"VAT {old['vat_percent']:g}% → {new['vat_percent']:g}%")
+    if old['lunch_end_hour'] != new['lunch_end_hour']: ch.append(f"hết buổi trưa {old['lunch_end_hour']}h → {new['lunch_end_hour']}h")
+    if old['group_size'] != new['group_size']:       ch.append(f"nhóm {old['group_size']} → {new['group_size']} người")
+    if old['dinner_days'] != new['dinner_days']:     ch.append(f"ưu đãi tối {days_label(old['dinner_days'])} → {days_label(new['dinner_days'])}")
+    if old['holidays'] != new['holidays']:           ch.append(f"ngày lễ {len(old['holidays'])} → {len(new['holidays'])} ngày")
+    audit('Khôi phục cấu hình mặc định' if data.get('reset') else 'Đổi cấu hình', 'Cấu hình', '; '.join(ch) or 'không đổi')
+    return jsonify({"success": True, "settings": new})
+
+
+# ---------- Xem nhật ký + ghi tự động các thao tác quản lí còn lại ----------
+
+@app.route('/api/manager/audit')
+def api_manager_audit():
+    q = (request.args.get('q') or '').strip()[:100]
+    try:
+        limit = max(1, min(int(request.args.get('limit') or 200), 500))
+    except ValueError:
+        limit = 200
+    like = f"%{q}%"
+    rows = query("""
+        SELECT id, to_char(at, 'DD/MM/YYYY HH24:MI:SS') AS at, actor, action, target, detail
+        FROM audit_log
+        WHERE %s = '' OR action ILIKE %s OR target ILIKE %s OR detail ILIKE %s
+        ORDER BY id DESC LIMIT %s""", (q, like, like, like, limit))
+    return jsonify({"logs": [dict(r) for r in rows]})
+
+
+AUDIT_ROUTES = [
+    (r'^/api/manager/staff/new$',               'Thêm nhân viên'),
+    (r'^/api/manager/staff/[^/]+/delete$',      'Xoá nhân viên'),
+    (r'^/api/manager/staff/[^/]+$',             'Sửa nhân viên'),
+    (r'^/api/manager/station/[^/]+/pin$',       'Đổi PIN trạm bếp'),
+    (r'^/api/manager/password$',                'Đổi mật khẩu'),
+    (r'^/api/manager/table/new$',               'Thêm bàn'),
+    (r'^/api/manager/table/[^/]+/delete$',      'Xoá bàn'),
+    (r'^/api/manager/table/[^/]+$',             'Sửa bàn'),
+    (r'^/api/manager/package/\d+$',             'Sửa gói buffet'),
+    (r'^/api/manager/alacarte/new$',            'Thêm món gọi lẻ'),
+    (r'^/api/manager/menu-item/new$',           'Thêm món buffet'),
+    (r'^/api/manager/reservations/new$',        'Nhập đơn đặt bàn'),
+]
+AUDIT_FIELDS = {'name': 'tên', 'role': 'chức vụ', 'is_active': 'trạng thái', 'price': 'giá', 'days': 'ngày áp dụng',
+                'capacity': 'số chỗ', 'min_capacity': 'số chỗ tối thiểu', 'floor': 'tầng', 'type': 'loại',
+                'category': 'nhóm', 'avatar': 'ảnh', 'customer_name': 'khách', 'guests': 'số khách',
+                'table_id': 'bàn', 'date': 'ngày', 'time': 'giờ', 'id': 'mã', 'package_ids': 'gói',
+                'station_code': 'trạm', 'station_id': 'trạm', 'phone': 'SĐT', 'note': 'ghi chú'}
+AUDIT_SECRET = {'pin', 'password', 'current', 'new'}
+
+
+@app.after_request
+def audit_manager_changes(resp):
+    """Tự ghi nhật ký cho các thao tác quản lí đã thành công mà không có đoạn ghi riêng. Không bao giờ ghi PIN/mật khẩu."""
+    try:
+        if (request.method != 'POST' or not request.path.startswith('/api/manager/') or getattr(g, 'audited', False)
+                or resp.status_code != 200 or not resp.is_json or not (resp.get_json() or {}).get('success')):
+            return resp
+        for pattern, label in AUDIT_ROUTES:
+            if re.match(pattern, request.path):
+                body = request.get_json(silent=True) or {}
+                parts = []
+                for k, v in body.items():
+                    if k in AUDIT_SECRET or k == 'which':
+                        continue
+                    if isinstance(v, bool):
+                        v = 'bật' if v else 'tắt'
+                    parts.append(f"{AUDIT_FIELDS.get(k, k)}: {v}")
+                if any(k in body for k in AUDIT_SECRET - {'password'}) and 'password' not in request.path:
+                    parts.append(('đặt mã PIN' if request.path.endswith('/new') else 'đổi mã PIN') if 'pin' in body else '')
+                if request.path.endswith('/password'):
+                    parts = ['mật khẩu ' + ('thu ngân' if body.get('which') == 'cashier' else 'quản lí')]
+                target = 'Mật khẩu' if request.path.endswith('/password') else body.get('name') or body.get('customer_name') or request.path.rstrip('/').split('/')[-2 if request.path.endswith(('/delete', '/pin')) else -1]
+                audit(label, target, ', '.join(x for x in parts if x))
+                break
+    except Exception:
+        pass
+    return resp
 
 
 # =========================================================
@@ -1813,13 +2233,6 @@ def test_db():
             "GROUP BY p.price ORDER BY p.price")]
     })
 
-import os
-from flask import send_from_directory
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
-                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

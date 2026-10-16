@@ -381,7 +381,7 @@
     document.getElementById('bSub').textContent = money(BILL.subtotal);
     document.getElementById('bDiscRow').classList.toggle('hidden', !BILL.discount);
     document.getElementById('bDisc').textContent = '− ' + money(BILL.discount);
-    document.getElementById('bVatLabel').textContent = 'VAT ' + Math.round(BILL.vat_rate * 100) + '%';
+    document.getElementById('bVatLabel').textContent = 'VAT ' + +(BILL.vat_rate * 100).toFixed(1) + '%';
     document.getElementById('bVat').textContent = money(BILL.vat);
     document.getElementById('bTotal').textContent = money(BILL.total);
 
@@ -482,8 +482,8 @@
     if (BILL.drink_name) html.push(row(BILL.drink_name + ' x' + BILL.guests, money(BILL.drink_amount)));
     BILL.lines.forEach(l => html.push(row(l.name + ' x' + l.qty, money(l.amount))));
     html.push('<hr>', row('Tạm tính', money(BILL.subtotal)));
-    if (BILL.discount) html.push(row('Giảm giá (đi 4 tính 3)', '-' + money(BILL.discount)));
-    html.push(row('VAT ' + Math.round(BILL.vat_rate * 100) + '%', money(BILL.vat)),
+    if (BILL.discount) html.push(row('Giảm giá (ưu đãi nhóm)', '-' + money(BILL.discount)));
+    html.push(row('VAT ' + +(BILL.vat_rate * 100).toFixed(1) + '%', money(BILL.vat)),
               '<hr>', '<b>' + row('TỔNG', money(BILL.total)) + '</b>');
     if (paid && CUR && CUR.method) html.push('<hr>', row('Thanh toán', METHOD_NAME[CUR.method]));
     html.push('<hr><div style="text-align:center">' + (paid ? 'Cảm ơn quý khách!' : '(Hoá đơn tạm tính)') + '</div>');
