@@ -2621,6 +2621,9 @@ def test_db():
             "GROUP BY p.price ORDER BY p.price")]
     })
 
+@app.route('/manager/qr-ban')
+def manager_qr_ban():
+    return render_template('QRban.html')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
