@@ -16,30 +16,33 @@
 
 <body class="bg-slate-950 text-slate-100 h-screen overflow-hidden">
 
-<div class="flex h-screen">
+<div class="flex flex-col md:flex-row h-screen">
 
   <!-- ================= THANH BÊN TRÁI ================= -->
-  <aside class="w-60 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
+  <aside class="md:w-60 shrink-0 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col">
 
-    <div class="p-5 border-b border-slate-800">
+    <div class="hidden md:block p-5 border-b border-slate-800">
       <p class="text-red-500 font-black tracking-[0.3em] text-xs">GYU SACHI</p>
       <h1 class="text-lg font-black text-white mt-1">BẾP</h1>
     </div>
 
     <!-- Trạm đang trực -->
-    <div class="p-5 border-b border-slate-800 text-center">
-      <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-950/60 text-3xl text-rose-400">
+    <div class="px-3 py-2 md:p-5 md:border-b border-slate-800 md:text-center flex md:block items-center gap-3">
+      <div class="md:mx-auto flex shrink-0 h-10 w-10 md:h-16 md:w-16 items-center justify-center rounded-full bg-rose-950/60 text-xl md:text-3xl text-rose-400">
         <i class="fa-solid {{ station.icon }}"></i>
       </div>
-      <h2 class="mt-3 font-black text-white">{{ station.name }}</h2>
-      <p class="text-xs text-slate-400 mt-1">{{ station.desc }}</p>
-      <span class="inline-block mt-3 px-3 py-0.5 bg-slate-950 text-rose-300 rounded-full text-[11px] font-semibold border border-rose-500/30">
+      <div class="flex-1 min-w-0">
+      <h2 class="md:mt-3 font-black text-white truncate">{{ station.name }}</h2>
+      <p class="hidden md:block text-xs text-slate-400 mt-1">{{ station.desc }}</p>
+      <span class="hidden md:inline-block mt-3 px-3 py-0.5 bg-slate-950 text-rose-300 rounded-full text-[11px] font-semibold border border-rose-500/30">
         MÃ: {{ station.id }}
       </span>
+      </div>
+      <a href="/#staff-choice" class="md:hidden shrink-0 px-3 py-2 rounded-xl border border-slate-700 text-slate-300 text-xs font-bold"><i class="fa-solid fa-right-from-bracket mr-1"></i>THOÁT</a>
     </div>
 
     <!-- Thống kê nhanh -->
-    <div class="p-4 space-y-2 flex-1">
+    <div class="hidden md:block p-4 space-y-2 flex-1">
       <div class="flex items-center justify-between rounded-xl bg-slate-950 border border-slate-800 px-4 py-3">
         <span class="text-xs text-slate-400">Món mới</span>
         <span id="count-new" class="font-black text-red-400">0</span>
@@ -52,13 +55,9 @@
         <span class="text-xs text-slate-400">Đã xong</span>
         <span id="count-done" class="font-black text-emerald-400">0</span>
       </div>
-      <button onclick="setView('stock')" class="w-full flex items-center justify-between rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-500 px-4 py-3 transition">
-        <span class="text-xs text-slate-400">Nguyên liệu sắp hết</span>
-        <span id="count-low" class="font-black text-slate-400">0</span>
-      </button>
     </div>
 
-    <div class="p-3 border-t border-slate-800">
+    <div class="hidden md:block p-3 border-t border-slate-800">
       <a href="/#staff-choice"
         class="block text-center px-4 py-3 rounded-xl border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-800 transition">
         <i class="fa-solid fa-right-from-bracket mr-2"></i>ĐĂNG XUẤT
@@ -67,48 +66,27 @@
   </aside>
 
   <!-- ================= KHU BÊN PHẢI: 3 CỘT ================= -->
-  <main class="flex-1 flex flex-col min-w-0">
+  <main class="flex-1 flex flex-col min-w-0 min-h-0">
 
-    <div class="px-6 py-4 border-b border-slate-800 flex flex-wrap items-center gap-4">
+    <div class="px-3 md:px-6 py-2 md:py-4 border-b border-slate-800 flex flex-wrap items-center gap-2 md:gap-4">
       <div class="min-w-0">
-        <h2 id="viewTitle" class="text-2xl font-black text-white uppercase tracking-wider">MÀN HÌNH NHẬN MÓN</h2>
-        <p id="viewSub" class="text-xs text-slate-400 mt-1">Món phục vụ gửi xuống sẽ tự hiện ở đây (cập nhật mỗi 4 giây)</p>
+        <h2 id="viewTitle" class="text-base md:text-2xl font-black text-white uppercase tracking-wider">MÀN HÌNH NHẬN MÓN</h2>
+        <p id="viewSub" class="hidden md:block text-xs text-slate-400 mt-1">Món phục vụ gửi xuống sẽ tự hiện ở đây (cập nhật mỗi 4 giây)</p>
       </div>
       <div class="flex-1"></div>
-      <div class="flex gap-2">
-        <button id="tab-board" onclick="setView('board')" class="vtab px-4 py-2 rounded-xl border text-sm font-bold transition"><i class="fa-solid fa-bell-concierge mr-2"></i>NHẬN MÓN</button>
-        <button id="tab-stock" onclick="setView('stock')" class="vtab px-4 py-2 rounded-xl border text-sm font-bold transition"><i class="fa-solid fa-boxes-stacked mr-2"></i>KHO NGUYÊN LIỆU</button>
-      </div>
     </div>
 
-    <!-- ===== KHO NGUYÊN LIỆU (bếp tự theo dõi) ===== -->
-    <div id="viewStock" class="hidden flex-1 overflow-y-auto p-4 space-y-4">
-      <div id="stCards" class="grid grid-cols-3 gap-3"></div>
-      <div class="flex flex-wrap items-center gap-3">
-        <input id="stSearch" oninput="renderStock()" placeholder="Tìm nguyên liệu..."
-          class="flex-1 min-w-[12rem] px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-rose-500 outline-none text-sm">
-        <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
-          <input id="stLow" type="checkbox" onchange="renderStock()" class="accent-rose-600"> Chỉ hiện hàng sắp hết
-        </label>
-        <button onclick="openNewIng()" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-black transition">
-          <i class="fa-solid fa-plus mr-2"></i>THÊM NGUYÊN LIỆU</button>
-      </div>
-      <div class="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
-            <tr><th class="text-left px-4 py-3">Nguyên liệu</th><th class="text-right px-4 py-3">Tồn kho</th>
-                <th class="text-right px-4 py-3">Cảnh báo khi còn</th><th class="text-right px-4 py-3">Thao tác</th></tr>
-          </thead>
-          <tbody id="stBody"></tbody>
-        </table>
-      </div>
-      <p class="text-xs text-slate-500">NHẬP: hàng mới về · DÙNG: lấy ra dùng · HỎNG: hao hụt, đổ bỏ · KIỂM KÊ: đếm thực tế rồi ghi đè số tồn. Món bấm XONG sẽ tự trừ nếu quản lí đã khai báo định lượng.</p>
+    <!-- Điện thoại: chọn 1 cột để xem -->
+    <div id="mColTabs" class="md:hidden grid grid-cols-3 gap-2 px-3 pt-2">
+      <button id="mt-new" onclick="mCol('new')" class="mt rounded-xl border border-red-900 py-2 text-xs font-black text-red-300">MỚI <span id="m-count-new">0</span></button>
+      <button id="mt-doing" onclick="mCol('doing')" class="mt rounded-xl border border-amber-900 py-2 text-xs font-black text-amber-300">ĐANG LÀM <span id="m-count-doing">0</span></button>
+      <button id="mt-done" onclick="mCol('done')" class="mt rounded-xl border border-emerald-900 py-2 text-xs font-black text-emerald-300">XONG <span id="m-count-done">0</span></button>
     </div>
 
-    <div id="viewBoard" class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 min-h-0">
+    <div id="viewBoard" class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 p-3 md:p-4 min-h-0">
 
       <!-- Cột: MỚI -->
-      <section class="flex flex-col rounded-2xl border border-red-950 bg-slate-900/60 min-h-0">
+      <section id="sec-new" class="flex flex-col rounded-2xl border border-red-950 bg-slate-900/60 min-h-0">
         <div class="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
           <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
           <h3 class="font-black text-sm tracking-widest text-red-400">MÓN MỚI</h3>
@@ -117,7 +95,7 @@
       </section>
 
       <!-- Cột: ĐANG LÀM -->
-      <section class="flex flex-col rounded-2xl border border-amber-950 bg-slate-900/60 min-h-0">
+      <section id="sec-doing" class="max-md:hidden flex flex-col rounded-2xl border border-amber-950 bg-slate-900/60 min-h-0">
         <div class="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
           <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
           <h3 class="font-black text-sm tracking-widest text-amber-400">ĐANG LÀM</h3>
@@ -126,7 +104,7 @@
       </section>
 
       <!-- Cột: ĐÃ XONG -->
-      <section class="flex flex-col rounded-2xl border border-emerald-950 bg-slate-900/60 min-h-0">
+      <section id="sec-done" class="max-md:hidden flex flex-col rounded-2xl border border-emerald-950 bg-slate-900/60 min-h-0">
         <div class="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
           <h3 class="font-black text-sm tracking-widest text-emerald-400">ĐÃ XONG</h3>
@@ -138,54 +116,6 @@
   </main>
 </div>
 
-
-<!-- Phiếu kho -->
-<div id="mvModal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) closeMv()">
-  <div class="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-6">
-    <div class="flex items-start justify-between gap-3">
-      <div><p class="text-[10px] text-slate-400 uppercase tracking-widest">Phiếu kho bếp</p>
-        <h4 id="mvTitle" class="text-lg font-black text-white"></h4>
-        <p id="mvCur" class="text-xs text-slate-400 mt-1"></p></div>
-      <button onclick="closeMv()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-rose-600 transition"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="mt-4 space-y-4">
-      <div><label class="kl">Loại phiếu</label>
-        <select id="mvKind" onchange="onMvKind()" class="kf">
-          <option value="IN">Nhập hàng mới về</option><option value="OUT">Dùng / xuất ra</option>
-          <option value="WASTE">Hao hụt / hỏng</option><option value="ADJUST">Kiểm kê (đặt lại số thực tế)</option></select></div>
-      <div><label id="mvQtyLbl" class="kl">Số lượng</label><input id="mvQty" inputmode="decimal" class="kf" onkeydown="if(event.key==='Enter') saveMv()"></div>
-      <div><label class="kl">Ghi chú (không bắt buộc)</label><input id="mvNote" maxlength="200" class="kf" placeholder="VD: nhập từ NCC A, rau héo..."></div>
-      <p id="mvErr" class="hidden text-sm text-red-400"></p>
-      <div class="flex gap-3">
-        <button onclick="closeMv()" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm">HUỶ</button>
-        <button onclick="saveMv()" class="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm">XÁC NHẬN</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Thêm nguyên liệu -->
-<div id="ngModal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) closeNewIng()">
-  <div class="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-6">
-    <div class="flex items-start justify-between gap-3">
-      <h4 class="text-lg font-black text-white">Thêm nguyên liệu</h4>
-      <button onclick="closeNewIng()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-rose-600 transition"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="mt-4 space-y-4">
-      <div><label class="kl">Tên nguyên liệu</label><input id="ngName" maxlength="120" class="kf" placeholder="VD: Hành lá"></div>
-      <div class="grid grid-cols-3 gap-3">
-        <div><label class="kl">Đơn vị</label><input id="ngUnit" maxlength="20" class="kf" value="kg"></div>
-        <div><label class="kl">Tồn đầu</label><input id="ngStock" inputmode="decimal" class="kf" value="0"></div>
-        <div><label class="kl">Cảnh báo</label><input id="ngMin" inputmode="decimal" class="kf" value="0"></div>
-      </div>
-      <p id="ngErr" class="hidden text-sm text-red-400"></p>
-      <div class="flex gap-3">
-        <button onclick="closeNewIng()" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm">HUỶ</button>
-        <button onclick="saveNewIng()" class="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm">LƯU</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <style>
   .vtab { border-color: #334155; color: #cbd5e1; }
@@ -285,6 +215,7 @@
     document.getElementById('count-new').textContent   = ORDER_ITEMS.filter(i => i.status === 'NEW').length;
     document.getElementById('count-doing').textContent = ORDER_ITEMS.filter(i => i.status === 'DOING').length;
     document.getElementById('count-done').textContent  = ORDER_ITEMS.filter(i => i.status === 'DONE').length;
+    ['new', 'doing', 'done'].forEach(k => { document.getElementById('m-count-' + k).textContent = document.getElementById('count-' + k).textContent; });
   }
 
 
@@ -343,118 +274,20 @@
   }
 
 
-  // ============ KHO NGUYÊN LIỆU CỦA BẾP ============
-  let view = 'board', STOCK = null, mvItem = null;
-  const fq = n => Number(n || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
-
-  function setView(v) {
-    view = v;
-    document.getElementById('viewBoard').classList.toggle('hidden', v !== 'board');
-    document.getElementById('viewStock').classList.toggle('hidden', v !== 'stock');
-    document.getElementById('tab-board').classList.toggle('active', v === 'board');
-    document.getElementById('tab-stock').classList.toggle('active', v === 'stock');
-    document.getElementById('viewTitle').textContent = v === 'board' ? 'MÀN HÌNH NHẬN MÓN' : 'KHO NGUYÊN LIỆU';
-    document.getElementById('viewSub').textContent = v === 'board'
-      ? 'Món phục vụ gửi xuống sẽ tự hiện ở đây (cập nhật mỗi 4 giây)'
-      : 'Bếp tự theo dõi nguyên liệu: nhập hàng, ghi dùng / hao hụt, kiểm kê';
-    if (v === 'stock') loadStock();
+  // Điện thoại: mỗi lần xem 1 cột (Mới / Đang làm / Xong)
+  function mCol(k) {
+    ['new', 'doing', 'done'].forEach(n => {
+      document.getElementById('sec-' + n).classList.toggle('max-md:hidden', n !== k);
+      document.getElementById('mt-' + n).classList.toggle('bg-slate-800', n === k);
+    });
   }
 
-  async function sApi(url, body) {
-    try {
-      const res = await fetch(url, body === undefined ? {} : {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      return await res.json();
-    } catch (e) { return { success: false, message: 'Mất kết nối tới máy chủ.' }; }
-  }
-
-  async function loadStock() {
-    const r = await sApi('/api/kitchen/stock?station=' + encodeURIComponent(STATION_ID));
-    if (!r.items) return;
-    STOCK = r;
-    const n = r.summary.low + r.summary.out;
-    const c = document.getElementById('count-low');
-    c.textContent = n; c.className = 'font-black ' + (n ? 'text-amber-400' : 'text-slate-400');
-    if (view === 'stock') renderStock();
-  }
-
-  function renderStock() {
-    if (!STOCK) return;
-    const s = STOCK.summary;
-    const cd = (t, v, c) => `<div class="rounded-2xl bg-slate-900 border border-slate-800 p-4"><p class="text-[10px] text-slate-400 uppercase tracking-widest">${t}</p><p class="text-2xl font-black mt-1 ${c}">${v}</p></div>`;
-    document.getElementById('stCards').innerHTML = cd('Nguyên liệu', s.count, 'text-white') +
-      cd('Sắp hết', s.low, s.low ? 'text-amber-300' : 'text-white') + cd('Hết hàng', s.out, s.out ? 'text-red-400' : 'text-white');
-    const q = document.getElementById('stSearch').value.trim().toLowerCase();
-    const low = document.getElementById('stLow').checked;
-    const rows = STOCK.items.filter(i => (!q || i.name.toLowerCase().includes(q)) && (!low || i.low));
-    document.getElementById('stBody').innerHTML = rows.map(i => {
-      const col = i.stock <= 0 ? 'text-red-400' : i.low ? 'text-amber-300' : 'text-white';
-      const tag = i.stock <= 0 ? '<span class="ml-2 px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-950 text-red-300">' + (i.stock < 0 ? 'Âm kho' : 'Hết') + '</span>'
-        : i.low ? '<span class="ml-2 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-950 text-amber-300">Sắp hết</span>' : '';
-      const b = (k, label, cls) => `<button data-id="${i.id}" data-k="${k}" onclick="openMv(this.dataset.id, this.dataset.k)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${cls}">${label}</button>`;
-      return `<tr class="border-t border-slate-800">
-        <td class="px-4 py-3 font-bold text-white">${esc(i.name)}${tag}</td>
-        <td class="px-4 py-3 text-right font-black ${col} whitespace-nowrap">${fq(i.stock)} <span class="text-xs font-normal text-slate-400">${esc(i.unit)}</span></td>
-        <td class="px-4 py-3 text-right text-slate-400">${fq(i.min_stock)}</td>
-        <td class="px-4 py-3"><div class="flex flex-wrap justify-end gap-1.5">
-          ${b('IN', 'NHẬP', 'border-emerald-700 text-emerald-300 hover:bg-emerald-700 hover:text-white')}
-          ${b('OUT', 'DÙNG', 'border-amber-700 text-amber-300 hover:bg-amber-700 hover:text-white')}
-          ${b('WASTE', 'HỎNG', 'border-red-700 text-red-300 hover:bg-red-700 hover:text-white')}
-          ${b('ADJUST', 'KIỂM KÊ', 'border-slate-600 text-slate-300 hover:bg-slate-700')}
-        </div></td></tr>`;
-    }).join('') || '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Không có nguyên liệu nào.</td></tr>';
-  }
-
-  function openMv(id, kind) {
-    const i = STOCK.items.find(x => String(x.id) === String(id));
-    mvItem = i;
-    document.getElementById('mvTitle').textContent = i.name;
-    document.getElementById('mvCur').textContent = 'Đang tồn: ' + fq(i.stock) + ' ' + i.unit;
-    document.getElementById('mvKind').value = kind;
-    document.getElementById('mvQty').value = '';
-    document.getElementById('mvNote').value = '';
-    document.getElementById('mvErr').classList.add('hidden');
-    onMvKind();
-    document.getElementById('mvModal').classList.remove('hidden');
-    document.getElementById('mvQty').focus();
-  }
-  function closeMv() { document.getElementById('mvModal').classList.add('hidden'); }
-  function onMvKind() {
-    const k = document.getElementById('mvKind').value;
-    document.getElementById('mvQtyLbl').textContent = (k === 'ADJUST' ? 'Số lượng đếm được thực tế' : 'Số lượng') + ' (' + (mvItem ? mvItem.unit : '') + ')';
-  }
-  async function saveMv() {
-    const r = await sApi('/api/kitchen/stock/' + mvItem.id + '/move', {
-      station_id: STATION_ID, kind: document.getElementById('mvKind').value,
-      qty: document.getElementById('mvQty').value, note: document.getElementById('mvNote').value });
-    if (!r.success) { const e = document.getElementById('mvErr'); e.textContent = r.message || 'Không lưu được'; e.classList.remove('hidden'); return; }
-    closeMv();
-    loadStock();
-  }
-
-  function openNewIng() {
-    ['ngName'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('ngUnit').value = 'kg'; document.getElementById('ngStock').value = '0'; document.getElementById('ngMin').value = '0';
-    document.getElementById('ngErr').classList.add('hidden');
-    document.getElementById('ngModal').classList.remove('hidden');
-    document.getElementById('ngName').focus();
-  }
-  function closeNewIng() { document.getElementById('ngModal').classList.add('hidden'); }
-  async function saveNewIng() {
-    const r = await sApi('/api/kitchen/stock/new', { station_id: STATION_ID, name: document.getElementById('ngName').value,
-      unit: document.getElementById('ngUnit').value, stock: document.getElementById('ngStock').value, min_stock: document.getElementById('ngMin').value });
-    if (!r.success) { const e = document.getElementById('ngErr'); e.textContent = r.message || 'Không lưu được'; e.classList.remove('hidden'); return; }
-    closeNewIng();
-    loadStock();
-  }
 
 
   // ============ KHỞI TẠO ============
-  setView('board');
+  mCol('new');
   loadItems();
-  loadStock();                       // để hiện số "nguyên liệu sắp hết" ở thanh bên
   setInterval(loadItems, 4000);      // 4 giây tự cập nhật một lần
-  setInterval(loadStock, 20000);     // kho: 20 giây một lần
 </script>
 
 </body>

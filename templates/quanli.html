@@ -57,21 +57,21 @@
 <!-- ================= GIAO DIỆN CHÍNH ================= -->
 <div id="app" class="hidden min-h-screen flex flex-col">
 
-  <header class="sticky top-0 z-30 flex flex-wrap items-center gap-3 px-5 py-3 bg-slate-900 border-b border-slate-800">
+  <header class="sticky top-0 z-30 flex flex-wrap items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 bg-slate-900 border-b border-slate-800">
     <div>
       <p class="text-red-500 font-black tracking-[.3em] text-[10px]">GYU SACHI</p>
       <h1 class="text-lg font-black leading-none">QUẢN LÍ</h1>
     </div>
 
-    <nav id="tabs" class="flex flex-wrap gap-2 sm:ml-4"></nav>
+    <nav id="tabs" class="order-last sm:order-none w-full sm:w-auto flex gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:ml-4"></nav>
     <div class="flex-1"></div>
     <button onclick="logout()"
-      class="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-800 transition">
-      <i class="fa-solid fa-right-from-bracket mr-2"></i>ĐĂNG XUẤT
+      class="px-3 md:px-4 py-2 rounded-xl border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-800 transition">
+      <i class="fa-solid fa-right-from-bracket md:mr-2"></i><span class="hidden md:inline">ĐĂNG XUẤT</span>
     </button>
   </header>
 
-  <main class="flex-1 p-5">
+  <main class="flex-1 p-3 md:p-5">
     <div class="max-w-6xl mx-auto">
 
       <!-- ===== 1. TỔNG QUAN ===== -->
@@ -405,76 +405,8 @@
       </section>
 
       <!-- ===== KHO: bếp / phục vụ (dùng chung 1 khối) ===== -->
-      <section id="v-inv" class="hidden space-y-4">
-        <div>
-          <h3 id="invTitleH" class="text-sm font-black uppercase tracking-widest text-slate-300"></h3>
-          <p id="invHint" class="text-xs text-slate-500 mt-1"></p>
-        </div>
-        <div id="invCards" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="relative flex-1 min-w-[12rem]">
-            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-            <input id="invSearch" oninput="renderInv()" placeholder="Tìm mặt hàng..."
-              class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-red-500 outline-none text-sm">
-          </div>
-          <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
-            <input id="invLowOnly" type="checkbox" onchange="renderInv()" class="accent-red-600"> Chỉ hiện hàng sắp hết
-          </label>
-          <button onclick="openInvItem()" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-black transition">
-            <i class="fa-solid fa-plus mr-2"></i>THÊM MẶT HÀNG</button>
-        </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
-                <tr><th class="text-left px-4 py-3">Mặt hàng</th><th class="text-right px-4 py-3">Tồn kho</th>
-                    <th class="text-right px-4 py-3">Mức cảnh báo</th><th class="text-right px-4 py-3">Giá vốn</th>
-                    <th class="text-right px-4 py-3">Giá trị tồn</th><th class="text-right px-4 py-3">Thao tác</th></tr>
-              </thead>
-              <tbody id="invBody"></tbody>
-            </table>
-          </div>
-        </div>
-        <p id="invFoot" class="text-xs text-slate-500"></p>
-      </section>
-
-      <!-- ===== KHO: định lượng món ===== -->
-      <section id="v-recipe" class="hidden space-y-4">
-        <div>
-          <h3 class="text-sm font-black uppercase tracking-widest text-slate-300">Định lượng món → nguyên liệu</h3>
-          <p class="text-xs text-slate-500 mt-1">Khai báo 1 phần món dùng bao nhiêu nguyên liệu. Khi bếp bấm XONG món, kho bếp tự trừ theo định lượng này (món chưa khai báo thì không trừ).</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="relative flex-1 min-w-[12rem]">
-            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-            <input id="rcSearch" oninput="renderRecipeDishes()" placeholder="Tìm món..."
-              class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-red-500 outline-none text-sm">
-          </div>
-          <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
-            <input id="rcMissing" type="checkbox" onchange="renderRecipeDishes()" class="accent-red-600"> Chỉ hiện món chưa có định lượng
-          </label>
-        </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
-                <tr><th class="text-left px-4 py-3">Món</th><th class="text-left px-4 py-3">Nhóm</th>
-                    <th class="text-left px-4 py-3">Loại</th><th class="text-center px-4 py-3">Định lượng</th>
-                    <th class="text-right px-4 py-3">Thao tác</th></tr>
-              </thead>
-              <tbody id="rcBody"></tbody>
-            </table>
-          </div>
-        </div>
-        <p id="rcCount" class="text-xs text-slate-500"></p>
-      </section>
-
-      <!-- ===== KHO: sổ kho ===== -->
       <section id="v-moves" class="hidden space-y-4">
         <div class="flex flex-wrap items-center gap-3">
-          <select id="mvWh" onchange="loadMoves()" class="fld !w-auto">
-            <option value="">Cả 2 kho</option><option value="BEP">Kho bếp</option><option value="PHUCVU">Kho phục vụ</option>
-          </select>
           <div class="relative flex-1 min-w-[12rem]">
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
             <input id="mvSearch" oninput="clearTimeout(mvTimer); mvTimer = setTimeout(loadMoves, 300)" placeholder="Tìm theo mặt hàng, ghi chú, món..."
@@ -487,9 +419,9 @@
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
-                <tr><th class="text-left px-4 py-3">Thời gian</th><th class="text-left px-4 py-3">Kho</th>
+                <tr><th class="text-left px-4 py-3">Thời gian</th>
                     <th class="text-left px-4 py-3">Mặt hàng</th><th class="text-left px-4 py-3">Loại</th>
-                    <th class="text-right px-4 py-3">Số lượng</th><th class="text-right px-4 py-3">Tồn sau</th>
+                    <th class="text-right px-4 py-3">Số lượng</th>
                     <th class="text-left px-4 py-3">Ghi chú</th></tr>
               </thead>
               <tbody id="mvBody"></tbody>
@@ -866,84 +798,6 @@
   </div>
 </div>
 
-<!-- ================= KHO: THÊM / SỬA MẶT HÀNG ================= -->
-<div id="invItemModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('invItemModal')">
-  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 max-h-[92vh] overflow-y-auto">
-    <div class="flex items-start justify-between">
-      <h4 id="ivTitle" class="text-lg font-black text-white"></h4>
-      <button onclick="hideM('invItemModal')" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="mt-4 space-y-4">
-      <div><label class="lbl">Tên mặt hàng</label><input id="ivName" maxlength="120" class="fld" placeholder="VD: Thịt bò"></div>
-      <div class="grid grid-cols-2 gap-3">
-        <div><label class="lbl">Đơn vị</label>
-          <input id="ivUnit" maxlength="20" list="unitList" class="fld" placeholder="kg, cái, gói...">
-          <datalist id="unitList"><option value="kg"><option value="g"><option value="lít"><option value="chai"><option value="cái"><option value="đôi"><option value="gói"><option value="hộp"><option value="thùng"></datalist></div>
-        <div id="ivStockBox"><label class="lbl">Tồn đầu kỳ</label><input id="ivStock" inputmode="decimal" class="fld" value="0"></div>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div><label class="lbl">Mức cảnh báo sắp hết</label><input id="ivMin" inputmode="decimal" class="fld" value="0"></div>
-        <div><label class="lbl">Giá vốn / 1 đơn vị (đ)</label><input id="ivCost" inputmode="numeric" class="fld" value="0"></div>
-      </div>
-      <p class="text-[11px] text-slate-500">Muốn đổi số lượng tồn sau này, dùng nút Nhập / Xuất / Kiểm kê để có lịch sử trong Sổ kho.</p>
-      <p id="ivErr" class="hidden text-sm text-red-400"></p>
-      <div class="flex gap-3 pt-1">
-        <button onclick="hideM('invItemModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
-        <button onclick="saveInvItem()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ================= KHO: PHIẾU NHẬP / XUẤT / KIỂM KÊ ================= -->
-<div id="moveModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('moveModal')">
-  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-6">
-    <div class="flex items-start justify-between gap-3">
-      <div><p class="text-[10px] text-slate-400 uppercase tracking-widest">Phiếu kho</p>
-        <h4 id="mvTitle" class="text-lg font-black text-white"></h4>
-        <p id="mvCur" class="text-xs text-slate-400 mt-1"></p></div>
-      <button onclick="hideM('moveModal')" class="shrink-0 w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="mt-4 space-y-4">
-      <div><label class="lbl">Loại phiếu</label>
-        <select id="mvKind" onchange="onMvKind()" class="fld">
-          <option value="IN">Nhập kho</option><option value="OUT">Xuất kho</option>
-          <option value="WASTE">Hao hụt / hỏng</option><option value="ADJUST">Kiểm kê (đặt lại số thực tế)</option>
-        </select></div>
-      <div><label id="mvQtyLbl" class="lbl">Số lượng</label><input id="mvQty" inputmode="decimal" class="fld" onkeydown="if(event.key==='Enter') saveMove()"></div>
-      <div><label class="lbl">Ghi chú (không bắt buộc)</label><input id="mvNote" maxlength="200" class="fld" placeholder="VD: nhập từ NCC A, hàng hỏng do rớt..."></div>
-      <p id="mvErr" class="hidden text-sm text-red-400"></p>
-      <div class="flex gap-3 pt-1">
-        <button onclick="hideM('moveModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
-        <button onclick="saveMove()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">XÁC NHẬN</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ================= KHO: ĐỊNH LƯỢNG MÓN ================= -->
-<div id="recipeModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('recipeModal')">
-  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 max-h-[92vh] overflow-y-auto">
-    <div class="flex items-start justify-between gap-3">
-      <div><p class="text-[10px] text-slate-400 uppercase tracking-widest">Định lượng cho 1 phần</p>
-        <h4 id="rcTitle" class="text-lg font-black text-white"></h4></div>
-      <button onclick="hideM('recipeModal')" class="shrink-0 w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div id="rcLines" class="mt-4 space-y-2"></div>
-    <button onclick="rcAddLine()" class="mt-3 px-3 py-2 rounded-xl border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-700">
-      <i class="fa-solid fa-plus mr-1.5"></i>Thêm nguyên liệu</button>
-    <p id="rcNone" class="hidden text-xs text-amber-300 mt-3">Kho bếp chưa có nguyên liệu nào, hãy thêm ở Kho → Kho bếp trước.</p>
-    <p id="rcErr" class="hidden text-sm text-red-400 mt-3"></p>
-    <div class="flex gap-3 pt-4">
-      <button onclick="hideM('recipeModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
-      <button onclick="saveRecipe()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU ĐỊNH LƯỢNG</button>
-    </div>
-  </div>
-</div>
-
-<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl"></div>
-
-
 <script>
   const TABS = [
     ['overview', 'fa-chart-line',   'Tổng quan'],
@@ -1082,8 +936,8 @@
     tab = t;
     document.getElementById('tabs').innerHTML = TABS.map(x => `
       <button data-t="${x[0]}" onclick="setTab(this.dataset.t)"
-        class="chip ${tab === x[0] ? 'active' : ''} px-4 py-2 rounded-xl border border-slate-700 text-sm font-bold hover:border-red-500 transition">
-        <i class="fa-solid ${x[1]} mr-2"></i>${x[2]}
+        class="chip shrink-0 whitespace-nowrap ${tab === x[0] ? 'active' : ''} px-3 md:px-4 py-2 rounded-xl border border-slate-700 text-xs md:text-sm font-bold hover:border-red-500 transition">
+        <i class="fa-solid ${x[1]} mr-1.5 md:mr-2"></i>${x[2]}
       </button>`).join('');
 
     // thanh mục con của "Chỉnh sửa"
@@ -1105,8 +959,8 @@
 
     let show = tab;                                        // khối nội dung đang hiện
     if (tab === 'edit') show = editSub;
-    else if (tab === 'stock') show = stockSub === 'bep' ? 'inv' : stockSub;   // 'pv' / 'recipe' / 'moves' trùng tên khối v-xxx
-    [...TABS.map(x => x[0]), ...EDIT_SUBS.map(x => x[0]), 'inv', 'pv', 'recipe', 'moves'].forEach(id => {
+    else if (tab === 'stock') show = stockSub;   // 'pv' / 'moves' trùng tên khối v-xxx
+    [...TABS.map(x => x[0]), ...EDIT_SUBS.map(x => x[0]), 'pv', 'moves'].forEach(id => {
       const el = document.getElementById('v-' + id);
       if (el) el.classList.toggle('hidden', id !== show);
     });
@@ -1120,8 +974,6 @@
     if (show === 'booking')  loadBooking();
     if (show === 'tables')   loadTables();
     if (show === 'packages') loadPackages();
-    if (show === 'inv')      loadInv();
-    if (show === 'recipe')   loadRecipeDishes();
     if (show === 'pv')       loadPv();
     if (show === 'moves')    loadMoves();
     if (show === 'settings') loadSettings();
@@ -2149,13 +2001,10 @@
 
   // ============ KHO ============
   const STOCK_SUBS = [
-    ['bep',    'fa-box-open',       'Kho bếp (nguyên liệu)'],
-    ['pv',     'fa-bell-concierge', 'Kho phục vụ'],
-    ['recipe', 'fa-scale-balanced', 'Định lượng món'],
-    ['moves',  'fa-clipboard-list', 'Sổ kho']
+    ['pv',    'fa-bell-concierge', 'Kho phục vụ'],
+    ['moves', 'fa-clipboard-list', 'Sổ kho']
   ];
-  let stockSub = 'bep';
-  const invWh = () => 'BEP';
+  let stockSub = 'pv';
   function setStockSub(s) { stockSub = s; setTab('stock'); }
   const fq = n => Number(n || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
   let mvTimer = null;
@@ -2303,199 +2152,19 @@
     loadPv();
   }
 
-  let INV = null, invEditId = null, mvItem = null;
-
-  async function loadInv() {
-    document.getElementById('invTitleH').textContent = 'Kho bếp — nguyên liệu';
-    document.getElementById('invHint').textContent =
-      'Bếp cũng tự theo dõi kho này trên màn hình Bếp. Nguyên liệu tự trừ khi bếp bấm XONG món (cần khai báo ở "Định lượng món"). Hàng dưới mức cảnh báo báo vàng, hết hàng báo đỏ.';
-    const r = await api('/api/manager/inventory?wh=' + invWh());
-    if (!r.items) return;
-    INV = r;
-    renderInv();
-  }
-
-  function renderInv() {
-    if (!INV) return;
-    const s = INV.summary;
-    document.getElementById('invCards').innerHTML =
-      card('Số mặt hàng', s.count) + card('Sắp hết', s.low, '', s.low ? 'text-amber-300' : 'text-white') +
-      card('Hết hàng', s.out, '', s.out ? 'text-red-400' : 'text-white') + card('Giá trị tồn', money(s.value));
-    const q = document.getElementById('invSearch').value.trim().toLowerCase();
-    const low = document.getElementById('invLowOnly').checked;
-    const rows = INV.items.filter(i => (!q || i.name.toLowerCase().includes(q)) && (!low || (i.is_active && i.low)));
-    document.getElementById('invBody').innerHTML = rows.map(i => {
-      const st = i.stock <= 0 ? 'text-red-400' : i.low ? 'text-amber-300' : 'text-white';
-      const tag = !i.is_active ? badge('Đã tắt', 'bg-slate-800 text-slate-400')
-        : i.stock <= 0 ? badge(i.stock < 0 ? 'Âm kho' : 'Hết hàng', 'bg-red-950 text-red-300')
-        : i.low ? badge('Sắp hết', 'bg-amber-950 text-amber-300') : '';
-      return `<tr class="border-t border-slate-800 ${i.is_active ? '' : 'opacity-50'}">
-        <td class="px-4 py-3"><span class="font-bold text-white">${esc(i.name)}</span> ${tag}
-          ${i.used_in ? `<span class="text-[11px] text-slate-500 ml-1">dùng trong ${i.used_in} món</span>` : ''}</td>
-        <td class="px-4 py-3 text-right font-black ${st} whitespace-nowrap">${fq(i.stock)} <span class="text-xs font-normal text-slate-400">${esc(i.unit)}</span></td>
-        <td class="px-4 py-3 text-right text-slate-400">${fq(i.min_stock)}</td>
-        <td class="px-4 py-3 text-right text-slate-300">${money(i.cost)}</td>
-        <td class="px-4 py-3 text-right text-slate-300">${money(i.value)}</td>
-        <td class="px-4 py-3"><div class="flex flex-wrap justify-end gap-1.5">
-          <button data-id="${i.id}" data-k="IN" onclick="openMove(this.dataset.id, this.dataset.k)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${B_GREEN}">Nhập</button>
-          <button data-id="${i.id}" data-k="OUT" onclick="openMove(this.dataset.id, this.dataset.k)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${B_AMBER}">Xuất</button>
-          <button data-id="${i.id}" data-k="ADJUST" onclick="openMove(this.dataset.id, this.dataset.k)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${B_GRAY}">Kiểm kê</button>
-          ${btn('Sửa', B_GRAY, 'openInvItem', i.id)}
-          ${btn(i.is_active ? 'Tắt' : 'Bật', i.is_active ? B_GRAY : B_GREEN, 'toggleInvItem', i.id)}
-          ${btn('Xoá', B_RED, 'delInvItem', i.id)}
-        </div></td></tr>`;
-    }).join('') || '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">Không có mặt hàng nào.</td></tr>';
-    document.getElementById('invFoot').textContent = 'Tồn âm nghĩa là bếp đã làm nhiều hơn số đã nhập: hãy nhập bổ sung hoặc kiểm kê lại.';
-  }
-
-  function openInvItem(id) {
-    const i = id ? INV.items.find(x => String(x.id) === String(id)) : null;
-    invEditId = i ? i.id : null;
-    document.getElementById('ivTitle').textContent = i ? 'Sửa mặt hàng' : 'Thêm nguyên liệu';
-    document.getElementById('ivName').value = i ? i.name : '';
-    document.getElementById('ivUnit').value = i ? i.unit : 'kg';
-    document.getElementById('ivStock').value = '0';
-    document.getElementById('ivStockBox').classList.toggle('hidden', !!i);
-    document.getElementById('ivMin').value = i ? i.min_stock : 0;
-    document.getElementById('ivCost').value = i ? i.cost : 0;
-    formErr('ivErr');
-    showM('invItemModal');
-    document.getElementById('ivName').focus();
-  }
-
-  async function saveInvItem() {
-    const body = { name: document.getElementById('ivName').value, unit: document.getElementById('ivUnit').value,
-                   min_stock: document.getElementById('ivMin').value, cost: document.getElementById('ivCost').value };
-    let url = '/api/manager/inventory/new';
-    if (invEditId) url = '/api/manager/inventory/' + invEditId;
-    else { body.warehouse = invWh(); body.stock = document.getElementById('ivStock').value; }
-    const r = await api(url, body);
-    if (!r.success) { formErr('ivErr', r.message || 'Không lưu được'); return; }
-    hideM('invItemModal');
-    toast(invEditId ? 'Đã cập nhật mặt hàng' : 'Đã thêm mặt hàng', true);
-    loadInv();
-  }
-
-  async function toggleInvItem(id) {
-    const i = INV.items.find(x => String(x.id) === String(id));
-    const r = await api('/api/manager/inventory/' + id, { is_active: !i.is_active });
-    if (!r.success) { toast(r.message || 'Không đổi được', false); return; }
-    toast(i.is_active ? 'Đã tắt mặt hàng' : 'Đã bật lại mặt hàng', true);
-    loadInv();
-  }
-
-  async function delInvItem(id) {
-    const i = INV.items.find(x => String(x.id) === String(id));
-    if (!confirm('Xoá "' + i.name + '" khỏi kho? Lịch sử nhập xuất của mặt hàng này cũng bị xoá.')) return;
-    const r = await api('/api/manager/inventory/' + id + '/delete', {});
-    if (!r.success) { toast(r.message || 'Không xoá được', false); return; }
-    toast('Đã xoá mặt hàng', true);
-    loadInv();
-  }
-
-  function openMove(id, kind) {
-    const i = INV.items.find(x => String(x.id) === String(id));
-    mvItem = i;
-    document.getElementById('mvTitle').textContent = i.name;
-    document.getElementById('mvCur').textContent = 'Đang tồn: ' + fq(i.stock) + ' ' + i.unit;
-    document.getElementById('mvKind').value = kind;
-    document.getElementById('mvQty').value = '';
-    document.getElementById('mvNote').value = '';
-    onMvKind();
-    formErr('mvErr');
-    showM('moveModal');
-    document.getElementById('mvQty').focus();
-  }
-  function onMvKind() {
-    const k = document.getElementById('mvKind').value;
-    document.getElementById('mvQtyLbl').textContent = (k === 'ADJUST' ? 'Số lượng đếm được thực tế' : 'Số lượng') + ' (' + (mvItem ? mvItem.unit : '') + ')';
-  }
-  async function saveMove() {
-    const r = await api('/api/manager/inventory/' + mvItem.id + '/move', {
-      kind: document.getElementById('mvKind').value, qty: document.getElementById('mvQty').value,
-      note: document.getElementById('mvNote').value });
-    if (!r.success) { formErr('mvErr', r.message || 'Không lưu được'); return; }
-    hideM('moveModal');
-    toast('Đã ghi phiếu kho. Tồn mới: ' + fq(r.stock) + ' ' + mvItem.unit, true);
-    loadInv();
-  }
-
-  // ----- Định lượng món -----
-  let RC_DISHES = [], RC_ITEMS = [], rcDish = null;
-  async function loadRecipeDishes() {
-    const r = await api('/api/manager/inventory/dishes');
-    if (!r.dishes) return;
-    RC_DISHES = r.dishes;
-    renderRecipeDishes();
-  }
-  function renderRecipeDishes() {
-    const q = document.getElementById('rcSearch').value.trim().toLowerCase();
-    const miss = document.getElementById('rcMissing').checked;
-    const rows = RC_DISHES.filter(d => (!q || d.name.toLowerCase().includes(q)) && (!miss || !d.lines));
-    document.getElementById('rcBody').innerHTML = rows.map((d, idx) => `
-      <tr class="border-t border-slate-800">
-        <td class="px-4 py-2.5 font-bold text-white">${esc(d.name)}</td>
-        <td class="px-4 py-2.5 text-slate-400">${esc(d.category || '')}</td>
-        <td class="px-4 py-2.5 text-slate-400">${esc(d.kind)}</td>
-        <td class="px-4 py-2.5 text-center">${d.lines ? badge(d.lines + ' nguyên liệu', 'bg-emerald-950 text-emerald-300') : badge('Chưa có', 'bg-slate-800 text-slate-400')}</td>
-        <td class="px-4 py-2.5 text-right"><button data-n="${esc(d.name)}" onclick="openRecipe(this.dataset.n)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${B_GRAY}">Đặt định lượng</button></td>
-      </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">Không có món nào.</td></tr>';
-    document.getElementById('rcCount').textContent = rows.length + ' món · ' + RC_DISHES.filter(d => d.lines).length + '/' + RC_DISHES.length + ' món đã có định lượng';
-  }
-  async function openRecipe(name) {
-    rcDish = name;
-    const [it, rc] = await Promise.all([api('/api/manager/inventory?wh=BEP'), api('/api/manager/inventory/recipe?dish=' + encodeURIComponent(name))]);
-    RC_ITEMS = (it.items || []).filter(i => i.is_active);
-    document.getElementById('rcTitle').textContent = name;
-    document.getElementById('rcNone').classList.toggle('hidden', RC_ITEMS.length > 0);
-    document.getElementById('rcLines').innerHTML = '';
-    (rc.lines || []).forEach(l => rcAddLine(l.item_id, l.qty));
-    if (!(rc.lines || []).length && RC_ITEMS.length) rcAddLine();
-    formErr('rcErr');
-    showM('recipeModal');
-  }
-  function rcAddLine(itemId, qty) {
-    const wrap = document.getElementById('rcLines');
-    const div = document.createElement('div');
-    div.className = 'flex items-center gap-2';
-    div.innerHTML = `<select class="fld rc-item" onchange="rcUnit(this)">${RC_ITEMS.map(i =>
-        `<option value="${i.id}" data-u="${esc(i.unit)}" ${String(i.id) === String(itemId) ? 'selected' : ''}>${esc(i.name)}</option>`).join('')}</select>
-      <input class="fld rc-qty !w-24 shrink-0" inputmode="decimal" placeholder="SL" value="${qty !== undefined ? qty : ''}">
-      <span class="rc-u w-10 shrink-0 text-xs text-slate-400"></span>
-      <button onclick="this.parentNode.remove()" class="shrink-0 w-9 h-9 rounded-lg border border-slate-700 text-slate-400 hover:bg-red-700 hover:text-white"><i class="fa-solid fa-xmark"></i></button>`;
-    wrap.appendChild(div);
-    rcUnit(div.querySelector('select'));
-  }
-  function rcUnit(sel) {
-    const o = sel.options[sel.selectedIndex];
-    sel.parentNode.querySelector('.rc-u').textContent = o ? o.dataset.u : '';
-  }
-  async function saveRecipe() {
-    const lines = [...document.querySelectorAll('#rcLines > div')].map(d => ({
-      item_id: d.querySelector('.rc-item').value, qty: d.querySelector('.rc-qty').value }));
-    const r = await api('/api/manager/inventory/recipe', { dish_name: rcDish, lines });
-    if (!r.success) { formErr('rcErr', r.message || 'Không lưu được'); return; }
-    hideM('recipeModal');
-    toast('Đã lưu định lượng', true);
-    loadRecipeDishes();
-  }
-
-  // ----- Sổ kho -----
+  // ----- Sổ kho phục vụ -----
   async function loadMoves() {
-    const r = await api('/api/manager/inventory/moves?wh=' + document.getElementById('mvWh').value +
-                        '&q=' + encodeURIComponent(document.getElementById('mvSearch').value.trim()));
+    const r = await api('/api/manager/inventory/moves?q=' + encodeURIComponent(document.getElementById('mvSearch').value.trim()));
     if (!r.moves) return;
-    const col = { IN: 'text-emerald-300', OUT: 'text-amber-300', WASTE: 'text-red-300', ADJUST: 'text-sky-300', ORDER: 'text-slate-300', AUTO: 'text-sky-300' };
+    const col = { IN: 'text-emerald-300', ADJUST: 'text-sky-300', AUTO: 'text-sky-300' };
     document.getElementById('mvBody').innerHTML = r.moves.map(m => `
       <tr class="border-t border-slate-800 align-top">
         <td class="px-4 py-2.5 text-slate-400 whitespace-nowrap">${esc(m.at)}</td>
-        <td class="px-4 py-2.5 text-slate-400">${m.warehouse === 'BEP' ? 'Bếp' : 'Phục vụ'}</td>
         <td class="px-4 py-2.5 font-bold text-white">${esc(m.name)}</td>
         <td class="px-4 py-2.5 font-bold ${col[m.kind] || ''}">${esc(m.label)}</td>
         <td class="px-4 py-2.5 text-right font-bold ${m.qty < 0 ? 'text-red-300' : 'text-emerald-300'} whitespace-nowrap">${m.qty > 0 ? '+' : ''}${fq(m.qty)} ${esc(m.unit)}</td>
-        <td class="px-4 py-2.5 text-right text-slate-300 whitespace-nowrap">${m.balance_after === null ? '—' : fq(m.balance_after)}</td>
         <td class="px-4 py-2.5 text-slate-400">${esc(m.note || '')}</td>
-      </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Chưa có phiếu kho nào.</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">Chưa có phiếu kho nào.</td></tr>';
     document.getElementById('mvCount').textContent = r.moves.length + ' dòng gần nhất' + (r.moves.length >= 200 ? ' (hiển thị 200 mới nhất, dùng ô tìm kiếm để lọc)' : '');
   }
 

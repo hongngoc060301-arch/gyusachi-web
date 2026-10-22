@@ -22,41 +22,45 @@
 
 <body class="bg-slate-950 text-slate-100 h-screen overflow-hidden">
 
-<div class="flex h-screen">
+<div class="flex flex-col md:flex-row h-screen">
 
   <!-- ================= THANH BÊN TRÁI ================= -->
-  <aside class="w-60 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
+  <aside class="md:w-60 shrink-0 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col">
 
-    <div class="p-5 border-b border-slate-800">
-      <p class="text-red-500 font-black tracking-[0.3em] text-xs">GYU SACHI</p>
-      <h1 class="text-lg font-black text-white mt-1">PHỤC VỤ</h1>
-      <p class="text-xs text-slate-400 mt-2">
-        <i class="fa-solid fa-user mr-1 text-amber-400"></i>
-        {{ staff.name }} · {{ staff.role }}
-      </p>
+    <div class="px-4 py-3 md:p-5 md:border-b border-slate-800 flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-red-500 font-black tracking-[0.3em] text-[10px] md:text-xs">GYU SACHI · PHỤC VỤ</p>
+        <p class="text-xs md:text-sm text-slate-300 md:text-slate-400 mt-1 truncate">
+          <i class="fa-solid fa-user mr-1 text-amber-400"></i>
+          {{ staff.name }} · {{ staff.role }}
+        </p>
+      </div>
+      <a href="/#staff-choice" class="md:hidden shrink-0 px-3 py-2 rounded-xl border border-slate-700 text-slate-300 text-xs font-bold">
+        <i class="fa-solid fa-right-from-bracket mr-1"></i>THOÁT
+      </a>
     </div>
 
-    <nav class="p-3 space-y-2 flex-1">
+    <nav class="px-3 pb-3 md:p-3 flex md:block gap-2 md:space-y-2 md:flex-1 overflow-x-auto no-scrollbar">
       <button id="side-all" onclick="setFloor('all')"
-        class="side-btn w-full text-left px-4 py-3 rounded-xl font-bold text-sm text-slate-300 hover:bg-slate-800 transition">
+        class="side-btn shrink-0 whitespace-nowrap md:w-full text-left px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm text-slate-300 hover:bg-slate-800 transition">
         <i class="fa-solid fa-table-cells-large mr-2"></i>TẤT CẢ
       </button>
       <button id="side-1" onclick="setFloor(1)"
-        class="side-btn w-full text-left px-4 py-3 rounded-xl font-bold text-sm text-slate-300 hover:bg-slate-800 transition">
+        class="side-btn shrink-0 whitespace-nowrap md:w-full text-left px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm text-slate-300 hover:bg-slate-800 transition">
         <i class="fa-solid fa-building mr-2"></i>TẦNG 1
       </button>
       <button id="side-2" onclick="setFloor(2)"
-        class="side-btn w-full text-left px-4 py-3 rounded-xl font-bold text-sm text-slate-300 hover:bg-slate-800 transition">
+        class="side-btn shrink-0 whitespace-nowrap md:w-full text-left px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm text-slate-300 hover:bg-slate-800 transition">
         <i class="fa-solid fa-building mr-2"></i>TẦNG 2
       </button>
 
-      <div class="pt-4 px-2 space-y-2 text-[11px] text-slate-400">
+      <div class="hidden md:block pt-4 px-2 space-y-2 text-[11px] text-slate-400">
         <div class="flex items-center gap-2"><span class="w-3 h-3 rounded border-2 border-slate-600 bg-slate-900"></span>Bàn trống</div>
         <div class="flex items-center gap-2"><span class="w-3 h-3 rounded border-2 border-red-500 bg-red-950"></span>Đang có khách</div>
       </div>
     </nav>
 
-    <div class="p-3 border-t border-slate-800">
+    <div class="hidden md:block p-3 border-t border-slate-800">
       <a href="/#staff-choice"
         class="block text-center px-4 py-3 rounded-xl border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-800 transition">
         <i class="fa-solid fa-right-from-bracket mr-2"></i>ĐĂNG XUẤT
@@ -65,9 +69,9 @@
   </aside>
 
   <!-- ================= KHU BÊN PHẢI ================= -->
-  <main class="flex-1 overflow-y-auto p-6">
+  <main class="flex-1 min-h-0 overflow-y-auto p-3 md:p-6">
 
-    <h2 id="floorTitle" class="text-2xl font-black text-white uppercase tracking-wider mb-6">TẤT CẢ BÀN</h2>
+    <h2 id="floorTitle" class="text-lg md:text-2xl font-black text-white uppercase tracking-wider mb-4 md:mb-6">TẤT CẢ BÀN</h2>
 
     <div id="tableGrid" class="space-y-8"></div>
   </main>
@@ -78,27 +82,27 @@
 <div id="orderModal" class="hidden fixed inset-0 z-50 bg-slate-950 flex flex-col">
 
   <!-- Thanh đầu -->
-  <header class="shrink-0 flex items-center gap-4 px-5 py-3 border-b border-slate-800 bg-slate-900">
+  <header class="shrink-0 flex items-center gap-2 md:gap-4 px-3 md:px-5 py-2 md:py-3 border-b border-slate-800 bg-slate-900">
     <div>
       <p class="text-[10px] text-slate-400 uppercase tracking-widest">Bàn</p>
-      <h3 id="mTableId" class="text-3xl font-black text-red-500 leading-none"></h3>
+      <h3 id="mTableId" class="text-2xl md:text-3xl font-black text-red-500 leading-none"></h3>
     </div>
     <div class="flex-1 min-w-0">
       <p id="mTableInfo" class="text-sm text-slate-300 truncate"></p>
       <div id="mOrderInfo" class="flex flex-wrap gap-2 mt-1"></div>
     </div>
     <button id="changeBtn" onclick="showChangeModal()"
-      class="hidden px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-bold text-sm transition">
-      <i class="fa-solid fa-ticket mr-2"></i>ĐỔI VÉ
+      class="hidden px-3 md:px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-bold text-sm transition">
+      <i class="fa-solid fa-ticket md:mr-2"></i><span class="hidden md:inline">ĐỔI VÉ</span>
     </button>
     <button onclick="closeModal()"
-      class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-red-600 font-bold text-sm transition">
-      <i class="fa-solid fa-xmark mr-2"></i>ĐÓNG
+      class="px-3 md:px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-red-600 font-bold text-sm transition">
+      <i class="fa-solid fa-xmark md:mr-2"></i><span class="hidden md:inline">ĐÓNG</span>
     </button>
   </header>
 
   <!-- ===== A. FORM MỞ BÀN (bàn chưa có khách) ===== -->
-  <section id="openForm" class="hidden flex-1 overflow-y-auto p-6">
+  <section id="openForm" class="hidden flex-1 overflow-y-auto p-4 md:p-6">
     <div class="max-w-3xl mx-auto space-y-8">
 
       <div>
@@ -125,7 +129,7 @@
       <div id="openError" class="hidden text-sm text-red-400"></div>
 
       <button onclick="submitOpen()"
-        class="px-10 py-4 rounded-2xl bg-red-600 hover:bg-red-500 font-black tracking-wider transition">
+        class="w-full md:w-auto px-10 py-4 rounded-2xl bg-red-600 hover:bg-red-500 font-black tracking-wider transition">
         <i class="fa-solid fa-door-open mr-2"></i>MỞ BÀN
       </button>
     </div>
@@ -137,8 +141,8 @@
     <!-- Bên trái: thực đơn -->
     <div class="flex-1 min-w-0 min-h-0 flex flex-col">
 
-      <div class="shrink-0 px-4 pt-3 space-y-3 border-b border-slate-800 pb-3">
-        <div id="menuTabs" class="flex gap-2"></div>
+      <div class="shrink-0 px-3 md:px-4 pt-2 md:pt-3 space-y-2 md:space-y-3 border-b border-slate-800 pb-2 md:pb-3">
+        <div id="menuTabs" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
 
         <div class="relative">
           <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
@@ -149,13 +153,13 @@
         <div id="catChips" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
       </div>
 
-      <div id="menuGrid" class="flex-1 overflow-y-auto p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start"></div>
+      <div id="menuGrid" class="flex-1 min-h-0 overflow-y-auto p-3 md:p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start"></div>
     </div>
 
     <!-- Bên phải: giỏ + món đã gọi -->
-    <aside class="lg:w-[24rem] shrink-0 min-h-0 max-h-[45vh] lg:max-h-none flex flex-col border-t lg:border-t-0 lg:border-l border-slate-800 bg-slate-900">
+    <aside class="lg:w-[24rem] shrink-0 min-h-0 max-h-[60vh] lg:max-h-none flex flex-col border-t lg:border-t-0 lg:border-l border-slate-800 bg-slate-900">
 
-      <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-5">
+      <div id="cartScroll" class="hidden lg:block flex-1 min-h-0 overflow-y-auto p-4 space-y-5">
 
         <div>
           <h4 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-2">
@@ -172,13 +176,17 @@
         </div>
       </div>
 
-      <div class="shrink-0 p-4 border-t border-slate-800 space-y-2">
+      <div class="shrink-0 p-3 lg:p-4 border-t border-slate-800 space-y-2">
+        <button type="button" onclick="toggleCart()" class="lg:hidden w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800 text-sm font-bold">
+          <span><i class="fa-solid fa-cart-shopping mr-2 text-amber-400"></i>Giỏ &amp; món đã gọi <span id="cartToggleCount" class="ml-1 px-2 py-0.5 rounded-full bg-red-600 text-xs">0</span></span>
+          <i id="cartToggleIcon" class="fa-solid fa-chevron-up"></i>
+        </button>
         <div id="cartTotal" class="flex justify-between text-sm text-slate-300"></div>
         <button id="sendBtn" onclick="sendToKitchen()"
           class="w-full py-3.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 font-black tracking-wider transition">
           <i class="fa-solid fa-paper-plane mr-2"></i>GỬI BẾP
         </button>
-        <p class="text-[11px] text-slate-500 text-center pt-1"><i class="fa-solid fa-cash-register mr-1"></i>Khách xong bữa, báo Thu ngân để thanh toán</p>
+        <p class="hidden lg:block text-[11px] text-slate-500 text-center pt-1"><i class="fa-solid fa-cash-register mr-1"></i>Khách xong bữa, báo Thu ngân để thanh toán</p>
       </div>
     </aside>
   </section>
@@ -222,7 +230,7 @@
 
 <!-- Thông báo nhỏ -->
 <!-- ================= YÊU CẦU TỪ BÀN (khách bấm gọi) ================= -->
-<div id="callPanel" class="hidden fixed top-4 right-4 z-[65] w-80 max-h-[70vh] overflow-y-auto space-y-2"></div>
+<div id="callPanel" class="hidden fixed top-2 md:top-4 right-2 md:right-4 z-[65] w-[calc(100vw-1rem)] sm:w-80 max-h-[32vh] md:max-h-[70vh] overflow-y-auto space-y-2"></div>
 
 <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl"></div>
 
@@ -323,7 +331,7 @@
 
         return `
           <button onclick="openTable('${esc(t.id)}')"
-            class="table-card rounded-2xl border-2 ${style} p-4 text-center">
+            class="table-card rounded-2xl border-2 ${style} p-2.5 md:p-4 text-center">
             <div class="text-2xl font-black text-white">
               ${isVip ? '<i class="fa-solid fa-crown text-amber-400 text-base mr-1"></i>' : ''}${esc(t.id)}
             </div>
@@ -336,7 +344,7 @@
           <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">
             <i class="fa-solid fa-building mr-2 text-red-500"></i>Tầng ${floor}
           </h3>
-          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">${cards}</div>
+          <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4">${cards}</div>
         </section>`;
     }).join('');
   }
@@ -526,7 +534,7 @@
 
     document.getElementById('menuTabs').innerHTML = tabs.map(t => `
       <button onclick="setTab('${t[0]}')"
-        class="chip ${tab === t[0] ? 'active' : ''} px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 text-sm font-bold hover:border-red-500 transition">
+        class="chip shrink-0 whitespace-nowrap ${tab === t[0] ? 'active' : ''} px-3 md:px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 text-sm font-bold hover:border-red-500 transition">
         <i class="fa-solid ${t[1]} mr-2"></i>${t[2]}
       </button>`).join('');
   }
@@ -681,6 +689,15 @@
     document.getElementById('cartTotal').innerHTML =
       `<span>${count} phần</span><span>${money_total ? 'Gọi lẻ: <b class="text-amber-400">' + money(money_total) + '</b>' : ''}</span>`;
     document.getElementById('sendBtn').disabled = CART.length === 0;
+    document.getElementById('cartToggleCount').textContent = count;
+  }
+
+  // Điện thoại: giỏ & món đã gọi thu gọn, bấm để mở
+  function toggleCart() {
+    const box = document.getElementById('cartScroll');
+    box.classList.toggle('hidden');
+    document.getElementById('cartToggleIcon').className =
+      'fa-solid ' + (box.classList.contains('hidden') ? 'fa-chevron-up' : 'fa-chevron-down');
   }
 
 

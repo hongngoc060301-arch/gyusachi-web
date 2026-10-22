@@ -700,8 +700,6 @@ def api_kitchen_status(item_id):
             RETURNING id
         """, (new_status, item_id, station_id, flow[new_status]))
         done = cur.fetchone()
-        if done and new_status == 'DONE':
-            deduct_stock_for_item(cur, item_id)          # trừ nguyên liệu theo định lượng (nếu món có định lượng)
 
     if not done:
         return fail("Món đã đổi trạng thái hoặc bị huỷ, hãy tải lại.", 409)
@@ -2239,7 +2237,7 @@ def api_manager_package(pid):
 
 
 # =========================================================
-# 8E. KHO PHỤC VỤ + KHO BẾP (cần chạy file 19_kho_phuc_vu.sql)
+# 8E. KHO PHỤC VỤ (cần chạy file 19_kho_phuc_vu.sql)
 # =========================================================
 
 def num(v, field, minimum=0, maximum=10_000_000):
@@ -2260,277 +2258,9 @@ def parse_day(s):
         raise OrderError("Ngày không hợp lệ.")
 
 
-WAREHOUSES = ('BEP',)          # kho phục vụ có bảng riêng (kho_phuc_vu) ở phần bên dưới
-MOVE_LABEL = {'IN': 'Nhập kho', 'OUT': 'Xuất kho', 'WASTE': 'Hao hụt / hỏng', 'ADJUST': 'Kiểm kê', 'ORDER': 'Trừ theo món'}
-
-
-def deduct_stock_for_item(cur, item_id):
-    """Bếp bấm XONG một món -> trừ nguyên liệu theo định lượng. Chưa chạy file 19 hoặc món chưa có định lượng thì bỏ qua,
-    không bao giờ làm hỏng thao tác của bếp. Kho có thể xuống số âm (báo đỏ để quản lí kiểm kê), không chặn bếp."""
-    try:
-        cur.execute("SAVEPOINT stock_sp")
-        cur.execute("SELECT name, qty FROM order_items WHERE id = %s", (item_id,))
-        it = cur.fetchone()
-        if not it:
-            cur.execute("RELEASE SAVEPOINT stock_sp")
-            return
-        cur.execute("""
-            SELECT r.item_id, r.qty * %s AS used, i.name
-            FROM recipes r JOIN inventory_items i ON i.id = r.item_id
-            WHERE r.dish_name = %s""", (it['qty'], it['name']))
-        for r in cur.fetchall():
-            cur.execute("UPDATE inventory_items SET stock = stock - %s WHERE id = %s RETURNING stock", (r['used'], r['item_id']))
-            bal = cur.fetchone()['stock']
-            cur.execute("""INSERT INTO stock_moves (item_id, kind, qty, balance_after, note, actor)
-                           VALUES (%s, 'ORDER', %s, %s, %s, 'Bếp')""",
-                        (r['item_id'], -r['used'], bal, f"{it['name']} x{it['qty']}"))
-        cur.execute("RELEASE SAVEPOINT stock_sp")
-    except Exception:
-        try:
-            cur.execute("ROLLBACK TO SAVEPOINT stock_sp")
-        except Exception:
-            pass
-
-
-def inv_row(r):
-    d = dict(r)
-    for k in ('stock', 'min_stock'):
-        d[k] = float(d[k])
-    d['low'] = d['stock'] <= d['min_stock']
-    d['value'] = round(d['stock'] * d['cost']) if d['stock'] > 0 else 0
-    return d
-
-
-@app.route('/api/manager/inventory')
-def api_manager_inventory():
-    wh = request.args.get('wh', 'BEP')
-    if wh not in WAREHOUSES:
-        return fail("Kho không hợp lệ.")
-    rows = query("""
-        SELECT i.id, i.name, i.unit, i.stock, i.min_stock, i.cost, i.is_active,
-               (SELECT COUNT(*) FROM recipes r WHERE r.item_id = i.id)::int AS used_in
-        FROM inventory_items i WHERE i.warehouse = %s ORDER BY i.name""", (wh,))
-    items = [inv_row(r) for r in rows]
-    act = [i for i in items if i['is_active']]
-    return jsonify({"items": items, "summary": {
-        "count": len(act), "low": sum(1 for i in act if i['low'] and i['stock'] > 0),
-        "out": sum(1 for i in act if i['stock'] <= 0), "value": sum(i['value'] for i in act)}})
-
-
-@app.route('/api/manager/inventory/new', methods=['POST'])
-def api_manager_inventory_new():
-    data = request.get_json() or {}
-    try:
-        wh = data.get('warehouse')
-        if wh not in WAREHOUSES:
-            raise OrderError("Kho không hợp lệ.")
-        name = clean_name(data.get('name'), 120)
-        unit = clean_name(data.get('unit'), 20)
-        stock = num(data.get('stock', 0), "Số lượng tồn")
-        min_stock = num(data.get('min_stock', 0), "Mức cảnh báo")
-        cost = int(num(data.get('cost', 0), "Giá vốn"))
-        with transaction() as cur:
-            cur.execute("SELECT 1 FROM inventory_items WHERE warehouse = %s AND lower(name) = lower(%s)", (wh, name))
-            if cur.fetchone():
-                raise OrderError("Kho này đã có mặt hàng cùng tên.")
-            cur.execute("""INSERT INTO inventory_items (warehouse, name, unit, stock, min_stock, cost)
-                           VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""", (wh, name, unit, stock, min_stock, cost))
-            new_id = cur.fetchone()['id']
-            if stock > 0:
-                cur.execute("""INSERT INTO stock_moves (item_id, kind, qty, balance_after, note)
-                               VALUES (%s, 'IN', %s, %s, 'Tồn đầu kỳ')""", (new_id, stock, stock))
-        audit('Thêm mặt hàng kho ' + ('bếp' if wh == 'BEP' else 'phục vụ'), name, f"tồn {stock} {unit}")
-    except OrderError as e:
-        return fail(str(e))
-    return jsonify({"success": True, "id": new_id})
-
-
-@app.route('/api/manager/inventory/<int:item_id>', methods=['POST'])
-def api_manager_inventory_edit(item_id):
-    data = request.get_json() or {}
-    try:
-        with transaction() as cur:
-            cur.execute("SELECT id, warehouse, name FROM inventory_items WHERE id = %s FOR UPDATE", (item_id,))
-            it = cur.fetchone()
-            if not it:
-                raise OrderError("Không tìm thấy mặt hàng.")
-            sets, params = [], []
-            if 'name' in data:
-                nm = clean_name(data['name'], 120)
-                cur.execute("SELECT 1 FROM inventory_items WHERE warehouse = %s AND lower(name) = lower(%s) AND id <> %s",
-                            (it['warehouse'], nm, item_id))
-                if cur.fetchone():
-                    raise OrderError("Kho này đã có mặt hàng cùng tên.")
-                sets.append("name = %s"); params.append(nm)
-            if 'unit' in data:
-                sets.append("unit = %s"); params.append(clean_name(data['unit'], 20))
-            if 'min_stock' in data:
-                sets.append("min_stock = %s"); params.append(num(data['min_stock'], "Mức cảnh báo"))
-            if 'cost' in data:
-                sets.append("cost = %s"); params.append(int(num(data['cost'], "Giá vốn")))
-            if 'is_active' in data:
-                sets.append("is_active = %s"); params.append(bool(data['is_active']))
-            if not sets:
-                raise OrderError("Không có gì để cập nhật.")
-            cur.execute(f"UPDATE inventory_items SET {', '.join(sets)} WHERE id = %s", (*params, item_id))
-        audit('Sửa mặt hàng kho', it['name'], ', '.join(
-            f"{ {'name': 'tên', 'unit': 'đơn vị', 'min_stock': 'mức cảnh báo', 'cost': 'giá vốn', 'is_active': 'trạng thái'}[k] }: "
-            f"{('bật' if v else 'tắt') if isinstance(v, bool) else v}" for k, v in data.items()
-            if k in ('name', 'unit', 'min_stock', 'cost', 'is_active')))
-    except OrderError as e:
-        return fail(str(e))
-    return jsonify({"success": True})
-
-
-@app.route('/api/manager/inventory/<int:item_id>/delete', methods=['POST'])
-def api_manager_inventory_delete(item_id):
-    with transaction() as cur:
-        cur.execute("SELECT id, name FROM inventory_items WHERE id = %s FOR UPDATE", (item_id,))
-        it = cur.fetchone()
-        if not it:
-            return fail("Không tìm thấy mặt hàng.", 404)
-        cur.execute("SELECT 1 FROM recipes WHERE item_id = %s LIMIT 1", (item_id,))
-        if cur.fetchone():
-            return fail("Nguyên liệu này đang nằm trong định lượng của món, hãy gỡ khỏi món trước (hoặc bấm TẮT để ẩn).")
-        cur.execute("SELECT 1 FROM stock_moves WHERE item_id = %s AND kind = 'ORDER' LIMIT 1", (item_id,))
-        if cur.fetchone():
-            return fail("Mặt hàng đã từng được trừ kho theo món nên giữ lại lịch sử, hãy bấm TẮT để ẩn.")
-        cur.execute("DELETE FROM inventory_items WHERE id = %s", (item_id,))
-    audit('Xoá mặt hàng kho', it['name'])
-    return jsonify({"success": True})
-
-
-def apply_stock_move(item_id, data, actor):
-    """Nhập / xuất / hao hụt / kiểm kê 1 nguyên liệu. Dùng chung cho Quản lí và Bếp. Trả (tên, đơn vị, delta, tồn mới, kind, note)."""
-    kind = data.get('kind')
-    if kind not in ('IN', 'OUT', 'WASTE', 'ADJUST'):
-        raise OrderError("Loại phiếu không hợp lệ.")
-    qty = num(data.get('qty'), "Số lượng", minimum=0)
-    if qty == 0 and kind != 'ADJUST':
-        raise OrderError("Số lượng phải lớn hơn 0.")
-    note = ' '.join(str(data.get('note') or '').split())[:200] or None
-    with transaction() as cur:
-        cur.execute("SELECT id, name, unit, stock, is_active FROM inventory_items WHERE id = %s FOR UPDATE", (item_id,))
-        it = cur.fetchone()
-        if not it:
-            raise OrderError("Không tìm thấy mặt hàng.")
-        old = float(it['stock'])
-        if kind == 'IN':
-            delta = qty
-        elif kind == 'ADJUST':
-            delta = round(qty - old, 2)
-        else:
-            delta = -qty
-            if old - qty < 0:
-                raise OrderError(f"Kho chỉ còn {old:g} {it['unit']}, không xuất/ghi hao hụt quá số đó được.")
-        new = round(old + delta, 2)
-        cur.execute("UPDATE inventory_items SET stock = %s WHERE id = %s", (new, item_id))
-        cur.execute("""INSERT INTO stock_moves (item_id, kind, qty, balance_after, note, actor)
-                       VALUES (%s, %s, %s, %s, %s, %s)""", (item_id, kind, delta, new, note, actor))
-    return it['name'], it['unit'], delta, new, kind, note
-
-
-@app.route('/api/manager/inventory/<int:item_id>/move', methods=['POST'])
-def api_manager_inventory_move(item_id):
-    """Nhập / xuất / hao hụt / kiểm kê. Với kiểm kê, qty là SỐ THỰC TẾ ĐẾM ĐƯỢC (kho sẽ đặt lại đúng số đó)."""
-    try:
-        name, unit, delta, new, kind, note = apply_stock_move(item_id, request.get_json() or {}, 'Quản lí')
-        audit(MOVE_LABEL[kind], name, f"{'+' if delta > 0 else ''}{delta:g} {unit} → tồn {new:g}" + (f" ({note})" if note else ''))
-    except OrderError as e:
-        return fail(str(e))
-    return jsonify({"success": True, "stock": new})
-
-
-# ---------- Màn hình bếp tự theo dõi kho nguyên liệu (xác nhận bằng mã trạm bếp, giống màn hình nhận món) ----------
-
-def kitchen_station(station_id):
-    st = query("SELECT id, name FROM stations WHERE id = %s", (station_id,), one=True)
-    if not st:
-        raise OrderError("Không xác định được trạm bếp, hãy đăng nhập lại.")
-    return st
-
-
-@app.route('/api/kitchen/stock')
-def api_kitchen_stock():
-    try:
-        kitchen_station(request.args.get('station'))
-    except OrderError as e:
-        return fail(str(e), 403)
-    rows = query("""SELECT i.id, i.name, i.unit, i.stock, i.min_stock, 0 AS cost, i.is_active,
-                           (SELECT to_char(MAX(m.created_at), 'DD/MM HH24:MI') FROM stock_moves m
-                             WHERE m.item_id = i.id AND m.kind = 'ADJUST') AS last_count
-                    FROM inventory_items i WHERE i.warehouse = 'BEP' AND i.is_active ORDER BY i.name""")
-    items = [inv_row(r) for r in rows]
-    return jsonify({"items": items, "summary": {
-        "count": len(items), "low": sum(1 for i in items if i['low'] and i['stock'] > 0),
-        "out": sum(1 for i in items if i['stock'] <= 0)}})
-
-
-@app.route('/api/kitchen/stock/<int:item_id>/move', methods=['POST'])
-def api_kitchen_stock_move(item_id):
-    data = request.get_json() or {}
-    try:
-        st = kitchen_station(data.get('station_id'))
-        name, unit, delta, new, kind, note = apply_stock_move(item_id, data, st['name'])
-        audit(MOVE_LABEL[kind] + ' (bếp)', name, f"{'+' if delta > 0 else ''}{delta:g} {unit} → tồn {new:g}" + (f" ({note})" if note else ''),
-              actor=st['name'])
-    except OrderError as e:
-        return fail(str(e))
-    return jsonify({"success": True, "stock": new})
-
-
-@app.route('/api/kitchen/stock/count', methods=['POST'])
-def api_kitchen_stock_count():
-    """Kiểm kê cuối ngày: bếp gõ số đếm được cho nhiều nguyên liệu, lưu 1 lần. Ô để trống = không kiểm kê mặt hàng đó."""
-    data = request.get_json() or {}
-    try:
-        st = kitchen_station(data.get('station_id'))
-        counts = data.get('counts') or []
-        if not isinstance(counts, list) or not counts:
-            raise OrderError("Chưa nhập số lượng nào.")
-        done, diffs = 0, []
-        for c in counts:
-            name, unit, delta, new, kind, note = apply_stock_move(
-                int(c.get('item_id')), {'kind': 'ADJUST', 'qty': c.get('qty'), 'note': 'Kiểm kê cuối ngày'}, st['name'])
-            done += 1
-            if delta:
-                diffs.append(f"{name} {'+' if delta > 0 else ''}{delta:g} {unit}")
-        audit('Kiểm kê cuối ngày (bếp)', st['name'], f"{done} nguyên liệu" + (f"; lệch: {', '.join(diffs)}" if diffs else '; không lệch'),
-              actor=st['name'])
-    except (OrderError, TypeError, ValueError) as e:
-        return fail(str(e) if isinstance(e, OrderError) else "Dữ liệu kiểm kê không hợp lệ.")
-    return jsonify({"success": True, "counted": done, "diff": len(diffs)})
-
-
-@app.route('/api/kitchen/stock/new', methods=['POST'])
-def api_kitchen_stock_new():
-    """Bếp thêm nguyên liệu mới (giá vốn để 0, quản lí cập nhật sau)."""
-    data = request.get_json() or {}
-    try:
-        st = kitchen_station(data.get('station_id'))
-        name = clean_name(data.get('name'), 120)
-        unit = clean_name(data.get('unit'), 20)
-        stock = num(data.get('stock', 0), "Số lượng tồn")
-        min_stock = num(data.get('min_stock', 0), "Mức cảnh báo")
-        with transaction() as cur:
-            cur.execute("SELECT 1 FROM inventory_items WHERE warehouse = 'BEP' AND lower(name) = lower(%s)", (name,))
-            if cur.fetchone():
-                raise OrderError("Kho đã có nguyên liệu cùng tên.")
-            cur.execute("""INSERT INTO inventory_items (warehouse, name, unit, stock, min_stock, cost)
-                           VALUES ('BEP', %s, %s, %s, %s, 0) RETURNING id""", (name, unit, stock, min_stock))
-            new_id = cur.fetchone()['id']
-            if stock > 0:
-                cur.execute("""INSERT INTO stock_moves (item_id, kind, qty, balance_after, note, actor)
-                               VALUES (%s, 'IN', %s, %s, 'Tồn đầu kỳ', %s)""", (new_id, stock, stock, st['name']))
-        audit('Thêm nguyên liệu (bếp)', name, f"tồn {stock} {unit}", actor=st['name'])
-    except OrderError as e:
-        return fail(str(e))
-    return jsonify({"success": True, "id": new_id})
-
-
 @app.route('/api/manager/inventory/moves')
 def api_manager_inventory_moves():
-    """Sổ kho gộp: kho bếp (stock_moves) + kho phục vụ (lich_su_kho). wh = BEP | PHUCVU | rỗng (cả 2)."""
+    """Sổ kho phục vụ (bảng lich_su_kho)."""
     wh = request.args.get('wh', '')
     q = (request.args.get('q') or '').strip()[:100]
     like = f"%{q}%"
@@ -2539,16 +2269,7 @@ def api_manager_inventory_moves():
     except ValueError:
         limit = 200
     out = []
-    if wh in ('', 'BEP'):
-        for r in query("""
-            SELECT m.created_at, to_char(m.created_at, 'DD/MM/YYYY HH24:MI') AS at, i.name, i.unit,
-                   m.kind, m.qty, m.balance_after, m.note
-            FROM stock_moves m JOIN inventory_items i ON i.id = m.item_id
-            WHERE %s = '' OR i.name ILIKE %s OR m.note ILIKE %s
-            ORDER BY m.id DESC LIMIT %s""", (q, like, like, limit)):
-            d = dict(r); d['warehouse'] = 'BEP'; d['label'] = MOVE_LABEL.get(d['kind'], d['kind'])
-            d['qty'] = float(d['qty']); d['balance_after'] = float(d['balance_after']); out.append(d)
-    if wh in ('', 'PHUCVU'):
+    if True:
         lab = {'NHAP': ('IN', 'Nhập kho'), 'XUAT_TU_DONG': ('AUTO', 'Tự trừ'), 'KIEM_KE': ('ADJUST', 'Kiểm kê')}
         for r in query("""
             SELECT l.created_at, to_char(l.created_at, 'DD/MM/YYYY HH24:MI') AS at, k.ten_vt AS name, k.dvt AS unit,
@@ -2756,61 +2477,6 @@ def api_manager_pv_chot():
     return jsonify({"success": True, "trimmed": n})
 
 
-# ---------- Định lượng món ----------
-
-@app.route('/api/manager/inventory/dishes')
-def api_manager_inventory_dishes():
-    rows = query("""
-        SELECT name, category, kind, COALESCE(n, 0)::int AS lines FROM (
-            SELECT m.name, m.category, 'Buffet' AS kind FROM menu_items m WHERE m.is_active
-            UNION
-            SELECT a.name, a.category, 'Gọi lẻ' FROM alacarte_items a WHERE a.is_active
-            UNION
-            SELECT c.item_name, 'Món trong combo', 'Combo' FROM combo_details c
-        ) d LEFT JOIN (SELECT dish_name, COUNT(*) AS n FROM recipes GROUP BY dish_name) r ON r.dish_name = d.name
-        ORDER BY kind, category, name""")
-    seen, out = set(), []
-    for r in rows:                                    # một tên món chỉ hiện 1 lần
-        if r['name'] in seen:
-            continue
-        seen.add(r['name']); out.append(dict(r))
-    return jsonify({"dishes": out})
-
-
-@app.route('/api/manager/inventory/recipe')
-def api_manager_inventory_recipe():
-    dish = (request.args.get('dish') or '').strip()
-    rows = query("""SELECT r.item_id, i.name, i.unit, r.qty FROM recipes r JOIN inventory_items i ON i.id = r.item_id
-                    WHERE r.dish_name = %s ORDER BY i.name""", (dish,))
-    return jsonify({"lines": [{**dict(r), "qty": float(r['qty'])} for r in rows]})
-
-
-@app.route('/api/manager/inventory/recipe', methods=['POST'])
-def api_manager_inventory_recipe_save():
-    data = request.get_json() or {}
-    try:
-        dish = clean_name(data.get('dish_name'), 255)
-        lines = data.get('lines') or []
-        clean, seen = [], set()
-        for ln in lines:
-            iid = int(ln.get('item_id'))
-            if iid in seen:
-                raise OrderError("Một nguyên liệu chỉ nên xuất hiện 1 lần trong món.")
-            seen.add(iid)
-            clean.append((iid, num(ln.get('qty'), "Định lượng", minimum=0.001, maximum=100000)))
-        with transaction() as cur:
-            cur.execute("DELETE FROM recipes WHERE dish_name = %s", (dish,))
-            for iid, q in clean:
-                cur.execute("SELECT 1 FROM inventory_items WHERE id = %s AND warehouse = 'BEP'", (iid,))
-                if not cur.fetchone():
-                    raise OrderError("Chỉ chọn nguyên liệu của kho bếp.")
-                cur.execute("INSERT INTO recipes (dish_name, item_id, qty) VALUES (%s, %s, %s)", (dish, iid, q))
-        audit('Sửa định lượng món', dish, f"{len(clean)} nguyên liệu")
-    except (OrderError, TypeError, ValueError) as e:
-        return fail(str(e) if isinstance(e, OrderError) else "Dữ liệu định lượng không hợp lệ.")
-    return jsonify({"success": True})
-
-
 # =========================================================
 # 8F. KHÁCH QUÉT QR Ở BÀN: TỰ GỌI MÓN, GỌI NHÂN VIÊN, XIN TÍNH TIỀN (cần chạy file 20_qr_goi_nhan_vien.sql)
 # =========================================================
@@ -2955,13 +2621,6 @@ def test_db():
             "GROUP BY p.price ORDER BY p.price")]
     })
 
-import os
-from flask import send_from_directory
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
-                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
