@@ -2623,7 +2623,7 @@ def test_db():
 
 @app.route('/manager/qr-ban')
 def manager_qr_ban():
-    return render_template('QRban.html')
+    return render_template('qr_ban.html')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
