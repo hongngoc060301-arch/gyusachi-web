@@ -159,6 +159,11 @@
             <div id="cashQuick" class="col-span-2 flex flex-wrap gap-2"></div>
           </div>
 
+          <div id="qrBox" class="hidden flex flex-col items-center gap-2 py-2">
+            <img id="qrImg" alt="Mã QR chuyển khoản" class="w-64 max-w-full rounded-xl bg-white p-2">
+            <p id="qrInfo" class="text-xs text-slate-400 text-center"></p>
+          </div>
+
           <div id="payError" class="hidden text-sm text-red-400"></div>
 
           <div class="flex gap-3">
@@ -269,6 +274,7 @@
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('who').innerHTML =
       '<i class="fa-solid fa-user mr-1 text-amber-400"></i>' + esc(CASHIER.name);
+    loadPayCfg();
     loadOrders();
   }
 
@@ -306,6 +312,7 @@
           <i class="fa-solid fa-users mr-1"></i>${o.guests} khách · ${esc(o.opened_at)}
           ${o.package_name ? ' · ' + esc(o.package_name) : ' · Gọi lẻ'}
         </div>
+        ${o.bill_requested ? `<div class="text-[11px] font-black text-emerald-300 mt-1"><i class="fa-solid fa-bell mr-1"></i>KHÁCH XIN TÍNH TIỀN</div>` : ''}
         ${o.pending ? `<div class="text-[11px] text-amber-400 mt-1"><i class="fa-solid fa-hourglass-half mr-1"></i>${o.pending} món bếp chưa xong</div>` : ''}
       </button>`).join('');
   }
@@ -384,6 +391,7 @@
     document.getElementById('bVatLabel').textContent = 'VAT ' + +(BILL.vat_rate * 100).toFixed(1) + '%';
     document.getElementById('bVat').textContent = money(BILL.vat);
     document.getElementById('bTotal').textContent = money(BILL.total);
+    renderQr();
 
     renderMethods();
     onCash();
@@ -396,6 +404,31 @@
       <div class="font-bold whitespace-nowrap">${money(amount)}</div></div>`;
   }
 
+  // ============ QR CHUYỂN KHOẢN (VietQR) ============
+  let PAYCFG = null;
+  function renderQr() {
+    const box = document.getElementById('qrBox');
+    if (!CUR || !BILL || CUR.method !== 'TRANSFER') { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    const img = document.getElementById('qrImg'), info = document.getElementById('qrInfo');
+    if (!PAYCFG || !PAYCFG.bank_id || !PAYCFG.account) {
+      img.classList.add('hidden');
+      info.innerHTML = '<span class="text-amber-400">Chưa cấu hình tài khoản ngân hàng. Quản lí vào Cấu hình → Thanh toán để nhập.</span>';
+      return;
+    }
+    const memo = 'Ban ' + BILL.table_id;
+    img.classList.remove('hidden');
+    img.src = 'https://img.vietqr.io/image/' + encodeURIComponent(PAYCFG.bank_id) + '-' + encodeURIComponent(PAYCFG.account)
+      + '-compact2.png?amount=' + Math.round(BILL.total) + '&addInfo=' + encodeURIComponent(memo)
+      + '&accountName=' + encodeURIComponent(PAYCFG.holder || '');
+    info.innerHTML = esc(PAYCFG.holder || '') + ' · ' + esc(PAYCFG.account) + '<br>Số tiền <b class="text-amber-400">' + money(BILL.total)
+      + '</b> · Nội dung: ' + esc(memo) + '<br>Kiểm tra tiền đã về tài khoản rồi mới bấm Thanh toán.';
+  }
+  async function loadPayCfg() {
+    const r = await api('/api/cashier/payment-config');
+    if (r && r.bank_id !== undefined) PAYCFG = r;
+  }
+
   function renderMethods() {
     document.getElementById('methodChips').innerHTML = METHODS.map(m => `
       <button data-m="${m[0]}" onclick="setMethod(this.dataset.m)"
@@ -403,6 +436,7 @@
         <i class="fa-solid ${m[1]} mr-2"></i>${m[2]}
       </button>`).join('');
     document.getElementById('cashBox').classList.toggle('hidden', CUR.method !== 'CASH');
+    renderQr();
     document.getElementById('payBtn').disabled = !CUR.method;
     onCash();
   }

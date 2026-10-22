@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>In mã QR bàn - Gyu Sachi</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f1f5f9; color: #0f172a; }
+    .bar { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #cbd5e1; padding: 12px 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .bar input { flex: 1; min-width: 260px; padding: 8px 10px; border: 1px solid #94a3b8; border-radius: 8px; }
+    .bar button { padding: 9px 18px; border: 0; border-radius: 8px; background: #dc2626; color: #fff; font-weight: bold; cursor: pointer; }
+    .hint { font-size: 12px; color: #64748b; padding: 8px 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; padding: 16px 20px; }
+    .card { background: #fff; border: 2px dashed #94a3b8; border-radius: 14px; padding: 16px; text-align: center; break-inside: avoid; }
+    .card h2 { margin: 0 0 2px; font-size: 22px; } .card small { color: #dc2626; font-weight: bold; letter-spacing: 3px; }
+    .qr { display: flex; justify-content: center; margin: 12px 0 8px; }
+    .card p { margin: 0; font-size: 12px; color: #475569; }
+    @media print { .bar, .hint { display: none; } body { background: #fff; } .grid { padding: 0; gap: 8px; } }
+  </style>
+</head>
+<body>
+<div class="bar">
+  <b>Địa chỉ web của nhà hàng:</b>
+  <input id="base" oninput="draw()" placeholder="http://192.168.1.10:5000">
+  <button onclick="window.print()">In tất cả</button>
+</div>
+<div class="hint">Điện thoại khách phải truy cập được địa chỉ này. Dùng IP mạng LAN của máy chủ (vd http://192.168.1.10:5000) hoặc tên miền thật, không dùng localhost.</div>
+<div id="grid" class="grid"></div>
+<script>
+  let TABLES = [];
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function draw() {
+    const base = document.getElementById('base').value.trim().replace(/\/+$/, '');
+    try { localStorage.setItem('qr_base', base); } catch (e) {}
+    const g = document.getElementById('grid'); g.innerHTML = '';
+    TABLES.forEach(t => {
+      const d = document.createElement('div'); d.className = 'card';
+      d.innerHTML = `<small>GYU SACHI</small><h2>Bàn ${esc(t.name || t.id)}</h2><div class="qr"></div><p>Quét mã để gọi món</p>`;
+      g.appendChild(d);
+      try { new QRCode(d.querySelector('.qr'), { text: base + '/ban/' + encodeURIComponent(t.id), width: 160, height: 160 }); }
+      catch (e) { d.querySelector('.qr').textContent = base + '/ban/' + t.id; }
+    });
+  }
+  (async function () {
+    let saved = ''; try { saved = localStorage.getItem('qr_base') || ''; } catch (e) {}
+    document.getElementById('base').value = saved || location.origin;
+    const r = await (await fetch('/api/manager/tables')).json();
+    TABLES = (r.tables || r || []).filter(t => t.is_active !== false && t.active !== false);
+    draw();
+  })();
+</script>
+</body>
+</html>

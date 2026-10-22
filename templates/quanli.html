@@ -107,6 +107,7 @@
           <i class="fa-solid fa-print mr-1.5"></i>In / Lưu PDF</button>
       </div>
       <div id="editNav" class="hidden flex flex-wrap gap-2 mb-5"></div>
+      <div id="stockNav" class="hidden flex flex-wrap gap-2 mb-5"></div>
       <p id="printTitle" class="hidden print:block text-center text-xl font-black mb-4"></p>
 
       <!-- ===== 2. BÁO CÁO ===== -->
@@ -321,6 +322,8 @@
           <button data-f="1"   onclick="setTblFloor(this.dataset.f)" class="tf chip px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500">Tầng 1</button>
           <button data-f="2"   onclick="setTblFloor(this.dataset.f)" class="tf chip px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500">Tầng 2</button>
           <div class="flex-1"></div>
+          <a href="/qr-ban" target="_blank" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-black transition">
+            <i class="fa-solid fa-qrcode mr-2"></i>IN MÃ QR BÀN</a>
           <button onclick="openTbl()" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-black transition">
             <i class="fa-solid fa-plus mr-2"></i>THÊM BÀN</button>
         </div>
@@ -356,6 +359,146 @@
       </section>
 
       <!-- ===== 9. CẤU HÌNH ===== -->
+      <!-- ===== KHO PHỤC VỤ ===== -->
+      <section id="v-pv" class="hidden space-y-4">
+        <div>
+          <h3 class="text-sm font-black uppercase tracking-widest text-slate-300">Kho phục vụ — vật tư, dụng cụ, vệ sinh</h3>
+          <p class="text-xs text-slate-500 mt-1">Vật tư “Tự trừ” sẽ được trừ khi bạn bấm CHỐT NGÀY (theo số khách hoặc theo ngày); vật tư “Thủ công” chỉ đổi khi Nhập hoặc Kiểm kê. Vỡ / mất thì ghi bằng Kiểm kê.</p>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-end gap-3">
+          <div><label class="lbl">Chốt ngày</label><input id="pvDay" type="date" onchange="loadPvDay()" class="fld !w-auto"></div>
+          <div><label class="lbl">Số khách trong ngày</label><input id="pvGuests" inputmode="numeric" class="fld !w-32" placeholder="VD: 180"></div>
+          <button onclick="doChot()" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-black transition">
+            <i class="fa-solid fa-lock mr-2"></i>CHỐT NGÀY &amp; TỰ TRỪ KHO</button>
+          <p id="pvDayInfo" class="text-xs text-slate-400 flex-1 min-w-[14rem]"></p>
+        </div>
+
+        <div id="pvCards" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+
+        <div id="pvGroups" class="flex flex-wrap gap-2"></div>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="relative flex-1 min-w-[12rem]">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+            <input id="pvSearch" oninput="renderPv()" placeholder="Tìm vật tư hoặc mã..."
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-red-500 outline-none text-sm">
+          </div>
+          <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+            <input id="pvLowOnly" type="checkbox" onchange="renderPv()" class="accent-red-600"> Chỉ hiện hàng sắp hết
+          </label>
+          <button onclick="openPvItem()" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-black transition">
+            <i class="fa-solid fa-plus mr-2"></i>THÊM VẬT TƯ</button>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                <tr><th class="text-left px-4 py-3">Mã</th><th class="text-left px-4 py-3">Vật tư</th>
+                    <th class="text-right px-4 py-3">Tồn</th><th class="text-right px-4 py-3">Tối thiểu</th>
+                    <th class="text-left px-4 py-3">Cập nhật</th><th class="text-right px-4 py-3">Thao tác</th></tr>
+              </thead>
+              <tbody id="pvBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p id="pvFoot" class="text-xs text-slate-500"></p>
+      </section>
+
+      <!-- ===== KHO: bếp / phục vụ (dùng chung 1 khối) ===== -->
+      <section id="v-inv" class="hidden space-y-4">
+        <div>
+          <h3 id="invTitleH" class="text-sm font-black uppercase tracking-widest text-slate-300"></h3>
+          <p id="invHint" class="text-xs text-slate-500 mt-1"></p>
+        </div>
+        <div id="invCards" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="relative flex-1 min-w-[12rem]">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+            <input id="invSearch" oninput="renderInv()" placeholder="Tìm mặt hàng..."
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-red-500 outline-none text-sm">
+          </div>
+          <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+            <input id="invLowOnly" type="checkbox" onchange="renderInv()" class="accent-red-600"> Chỉ hiện hàng sắp hết
+          </label>
+          <button onclick="openInvItem()" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-black transition">
+            <i class="fa-solid fa-plus mr-2"></i>THÊM MẶT HÀNG</button>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                <tr><th class="text-left px-4 py-3">Mặt hàng</th><th class="text-right px-4 py-3">Tồn kho</th>
+                    <th class="text-right px-4 py-3">Mức cảnh báo</th><th class="text-right px-4 py-3">Giá vốn</th>
+                    <th class="text-right px-4 py-3">Giá trị tồn</th><th class="text-right px-4 py-3">Thao tác</th></tr>
+              </thead>
+              <tbody id="invBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p id="invFoot" class="text-xs text-slate-500"></p>
+      </section>
+
+      <!-- ===== KHO: định lượng món ===== -->
+      <section id="v-recipe" class="hidden space-y-4">
+        <div>
+          <h3 class="text-sm font-black uppercase tracking-widest text-slate-300">Định lượng món → nguyên liệu</h3>
+          <p class="text-xs text-slate-500 mt-1">Khai báo 1 phần món dùng bao nhiêu nguyên liệu. Khi bếp bấm XONG món, kho bếp tự trừ theo định lượng này (món chưa khai báo thì không trừ).</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="relative flex-1 min-w-[12rem]">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+            <input id="rcSearch" oninput="renderRecipeDishes()" placeholder="Tìm món..."
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-red-500 outline-none text-sm">
+          </div>
+          <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+            <input id="rcMissing" type="checkbox" onchange="renderRecipeDishes()" class="accent-red-600"> Chỉ hiện món chưa có định lượng
+          </label>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                <tr><th class="text-left px-4 py-3">Món</th><th class="text-left px-4 py-3">Nhóm</th>
+                    <th class="text-left px-4 py-3">Loại</th><th class="text-center px-4 py-3">Định lượng</th>
+                    <th class="text-right px-4 py-3">Thao tác</th></tr>
+              </thead>
+              <tbody id="rcBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p id="rcCount" class="text-xs text-slate-500"></p>
+      </section>
+
+      <!-- ===== KHO: sổ kho ===== -->
+      <section id="v-moves" class="hidden space-y-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <select id="mvWh" onchange="loadMoves()" class="fld !w-auto">
+            <option value="">Cả 2 kho</option><option value="BEP">Kho bếp</option><option value="PHUCVU">Kho phục vụ</option>
+          </select>
+          <div class="relative flex-1 min-w-[12rem]">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+            <input id="mvSearch" oninput="clearTimeout(mvTimer); mvTimer = setTimeout(loadMoves, 300)" placeholder="Tìm theo mặt hàng, ghi chú, món..."
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-red-500 outline-none text-sm">
+          </div>
+          <button onclick="loadMoves()" class="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-800 transition">
+            <i class="fa-solid fa-rotate mr-2"></i>Làm mới</button>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                <tr><th class="text-left px-4 py-3">Thời gian</th><th class="text-left px-4 py-3">Kho</th>
+                    <th class="text-left px-4 py-3">Mặt hàng</th><th class="text-left px-4 py-3">Loại</th>
+                    <th class="text-right px-4 py-3">Số lượng</th><th class="text-right px-4 py-3">Tồn sau</th>
+                    <th class="text-left px-4 py-3">Ghi chú</th></tr>
+              </thead>
+              <tbody id="mvBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p id="mvCount" class="text-xs text-slate-500"></p>
+      </section>
+
       <section id="v-settings" class="hidden max-w-2xl space-y-5">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
           <h3 class="text-sm font-black uppercase tracking-widest text-slate-300">Thuế &amp; giờ bán</h3>
@@ -379,6 +522,25 @@
             <textarea id="cfHol" rows="6" class="fld font-mono" placeholder="02/09&#10;30/04&#10;06/02/2027"></textarea>
             <p class="text-[11px] text-slate-500 mt-1">Mỗi ngày một dòng. <b class="text-slate-300">dd/mm</b> = lặp lại mỗi năm (VD 02/09),
               <b class="text-slate-300">dd/mm/yyyy</b> = chỉ riêng năm đó (VD 06/02/2027 cho Tết).</p></div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+          <h3 class="text-sm font-black uppercase tracking-widest text-slate-300">Tài khoản nhận chuyển khoản (mã QR ở thu ngân)</h3>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div><label class="lbl">Ngân hàng</label>
+              <select id="pyBank" class="fld"><option value="">— Chọn ngân hàng —</option>
+                <option value="VCB">Vietcombank</option><option value="TCB">Techcombank</option><option value="MB">MB Bank</option>
+                <option value="ACB">ACB</option><option value="BIDV">BIDV</option><option value="ICB">VietinBank</option>
+                <option value="VBA">Agribank</option><option value="TPB">TPBank</option><option value="VPB">VPBank</option>
+                <option value="STB">Sacombank</option><option value="SHB">SHB</option><option value="OCB">OCB</option>
+                <option value="MSB">MSB</option><option value="HDB">HDBank</option><option value="VIB">VIB</option>
+                <option value="SCB">SCB</option><option value="EIB">Eximbank</option><option value="LPB">LPBank</option></select></div>
+            <div><label class="lbl">Số tài khoản</label><input id="pyAcc" inputmode="numeric" class="fld" placeholder="0123456789"></div>
+          </div>
+          <div><label class="lbl">Tên chủ tài khoản (không dấu)</label><input id="pyHolder" class="fld uppercase" placeholder="NGUYEN VAN A"></div>
+          <p id="pyErr" class="hidden text-sm text-red-400"></p>
+          <button onclick="savePayment()" class="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU TÀI KHOẢN</button>
+          <p class="text-[11px] text-slate-500">Thu ngân chọn "Chuyển khoản" sẽ thấy mã VietQR có sẵn số tiền và nội dung. Hệ thống không tự biết tiền đã về, thu ngân phải kiểm tra tin nhắn ngân hàng.</p>
         </div>
 
         <p id="cfExample" class="text-sm text-amber-300 bg-amber-950/30 border border-amber-900/50 rounded-xl px-4 py-3"></p>
@@ -644,6 +806,141 @@
   </div>
 </div>
 
+<!-- ================= KHO PHỤC VỤ: THÊM / SỬA VẬT TƯ ================= -->
+<div id="pvItemModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('pvItemModal')">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-start justify-between">
+      <h4 id="pvTitle" class="text-lg font-black text-white"></h4>
+      <button onclick="hideM('pvItemModal')" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mt-4 space-y-4">
+      <div><label class="lbl">Tên vật tư</label><input id="pvName" maxlength="150" class="fld"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div id="pvGroupBox"><label class="lbl">Nhóm</label><select id="pvGroup" class="fld"></select></div>
+        <div><label class="lbl">Đơn vị</label><input id="pvUnit" maxlength="20" class="fld" placeholder="cái, kg, gói..."></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div id="pvStockBox"><label class="lbl">Tồn đầu kỳ</label><input id="pvStock" inputmode="decimal" class="fld" value="0"></div>
+        <div><label class="lbl">Mức cảnh báo</label><input id="pvMin" inputmode="decimal" class="fld" value="0"></div>
+      </div>
+      <div><label class="lbl">Cách cập nhật tồn</label>
+        <select id="pvMu" onchange="onPvMu()" class="fld">
+          <option value="2">Thủ công (nhập / kiểm kê)</option><option value="1">Tự trừ khi chốt ngày</option></select></div>
+      <div id="pvAutoBox" class="hidden grid grid-cols-2 gap-3">
+        <div><label class="lbl">Trừ theo</label>
+          <select id="pvKieu" class="fld"><option value="KHACH">Số khách</option><option value="NGAY">Mỗi ngày</option></select></div>
+        <div><label class="lbl">Định mức</label><input id="pvDm" inputmode="decimal" class="fld" placeholder="VD: 0.15"></div>
+        <p class="col-span-2 text-[11px] text-slate-500">Theo số khách: trừ (định mức × số khách). Mỗi ngày: trừ đúng định mức đó.</p>
+      </div>
+      <div><label class="lbl">Ghi chú</label><input id="pvNote" maxlength="300" class="fld"></div>
+      <p id="pvErr" class="hidden text-sm text-red-400"></p>
+      <div class="flex gap-3 pt-1">
+        <button onclick="hideM('pvItemModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+        <button onclick="savePvItem()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= KHO PHỤC VỤ: NHẬP / KIỂM KÊ ================= -->
+<div id="pvMoveModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('pvMoveModal')">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-6">
+    <div class="flex items-start justify-between gap-3">
+      <div><p class="text-[10px] text-slate-400 uppercase tracking-widest">Phiếu kho phục vụ</p>
+        <h4 id="pmTitle" class="text-lg font-black text-white"></h4>
+        <p id="pmCur" class="text-xs text-slate-400 mt-1"></p></div>
+      <button onclick="hideM('pvMoveModal')" class="shrink-0 w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mt-4 space-y-4">
+      <div><label class="lbl">Loại phiếu</label>
+        <select id="pmKind" onchange="onPmKind()" class="fld">
+          <option value="IN">Nhập thêm hàng mới về</option><option value="ADJUST">Kiểm kê (đặt lại số thực tế)</option></select></div>
+      <div><label id="pmQtyLbl" class="lbl">Số lượng</label><input id="pmQty" inputmode="decimal" class="fld" onkeydown="if(event.key==='Enter') savePvMove()"></div>
+      <div><label class="lbl">Ghi chú (không bắt buộc)</label><input id="pmNote" maxlength="200" class="fld" placeholder="VD: nhập đợt 1, vỡ 3 cái..."></div>
+      <p id="pmErr" class="hidden text-sm text-red-400"></p>
+      <div class="flex gap-3 pt-1">
+        <button onclick="hideM('pvMoveModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+        <button onclick="savePvMove()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">XÁC NHẬN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= KHO: THÊM / SỬA MẶT HÀNG ================= -->
+<div id="invItemModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('invItemModal')">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-start justify-between">
+      <h4 id="ivTitle" class="text-lg font-black text-white"></h4>
+      <button onclick="hideM('invItemModal')" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mt-4 space-y-4">
+      <div><label class="lbl">Tên mặt hàng</label><input id="ivName" maxlength="120" class="fld" placeholder="VD: Thịt bò"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Đơn vị</label>
+          <input id="ivUnit" maxlength="20" list="unitList" class="fld" placeholder="kg, cái, gói...">
+          <datalist id="unitList"><option value="kg"><option value="g"><option value="lít"><option value="chai"><option value="cái"><option value="đôi"><option value="gói"><option value="hộp"><option value="thùng"></datalist></div>
+        <div id="ivStockBox"><label class="lbl">Tồn đầu kỳ</label><input id="ivStock" inputmode="decimal" class="fld" value="0"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Mức cảnh báo sắp hết</label><input id="ivMin" inputmode="decimal" class="fld" value="0"></div>
+        <div><label class="lbl">Giá vốn / 1 đơn vị (đ)</label><input id="ivCost" inputmode="numeric" class="fld" value="0"></div>
+      </div>
+      <p class="text-[11px] text-slate-500">Muốn đổi số lượng tồn sau này, dùng nút Nhập / Xuất / Kiểm kê để có lịch sử trong Sổ kho.</p>
+      <p id="ivErr" class="hidden text-sm text-red-400"></p>
+      <div class="flex gap-3 pt-1">
+        <button onclick="hideM('invItemModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+        <button onclick="saveInvItem()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= KHO: PHIẾU NHẬP / XUẤT / KIỂM KÊ ================= -->
+<div id="moveModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('moveModal')">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-6">
+    <div class="flex items-start justify-between gap-3">
+      <div><p class="text-[10px] text-slate-400 uppercase tracking-widest">Phiếu kho</p>
+        <h4 id="mvTitle" class="text-lg font-black text-white"></h4>
+        <p id="mvCur" class="text-xs text-slate-400 mt-1"></p></div>
+      <button onclick="hideM('moveModal')" class="shrink-0 w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="mt-4 space-y-4">
+      <div><label class="lbl">Loại phiếu</label>
+        <select id="mvKind" onchange="onMvKind()" class="fld">
+          <option value="IN">Nhập kho</option><option value="OUT">Xuất kho</option>
+          <option value="WASTE">Hao hụt / hỏng</option><option value="ADJUST">Kiểm kê (đặt lại số thực tế)</option>
+        </select></div>
+      <div><label id="mvQtyLbl" class="lbl">Số lượng</label><input id="mvQty" inputmode="decimal" class="fld" onkeydown="if(event.key==='Enter') saveMove()"></div>
+      <div><label class="lbl">Ghi chú (không bắt buộc)</label><input id="mvNote" maxlength="200" class="fld" placeholder="VD: nhập từ NCC A, hàng hỏng do rớt..."></div>
+      <p id="mvErr" class="hidden text-sm text-red-400"></p>
+      <div class="flex gap-3 pt-1">
+        <button onclick="hideM('moveModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+        <button onclick="saveMove()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">XÁC NHẬN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= KHO: ĐỊNH LƯỢNG MÓN ================= -->
+<div id="recipeModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) hideM('recipeModal')">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-start justify-between gap-3">
+      <div><p class="text-[10px] text-slate-400 uppercase tracking-widest">Định lượng cho 1 phần</p>
+        <h4 id="rcTitle" class="text-lg font-black text-white"></h4></div>
+      <button onclick="hideM('recipeModal')" class="shrink-0 w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="rcLines" class="mt-4 space-y-2"></div>
+    <button onclick="rcAddLine()" class="mt-3 px-3 py-2 rounded-xl border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-700">
+      <i class="fa-solid fa-plus mr-1.5"></i>Thêm nguyên liệu</button>
+    <p id="rcNone" class="hidden text-xs text-amber-300 mt-3">Kho bếp chưa có nguyên liệu nào, hãy thêm ở Kho → Kho bếp trước.</p>
+    <p id="rcErr" class="hidden text-sm text-red-400 mt-3"></p>
+    <div class="flex gap-3 pt-4">
+      <button onclick="hideM('recipeModal')" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+      <button onclick="saveRecipe()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">LƯU ĐỊNH LƯỢNG</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl"></div>
 
 
@@ -654,6 +951,7 @@
     ['dishes',   'fa-ranking-star', 'Thống kê món'],
     ['booking',  'fa-calendar-check', 'Đặt bàn'],
     ['edit',     'fa-pen-to-square', 'Chỉnh sửa'],
+    ['stock',    'fa-boxes-stacked', 'Kho'],
     ['settings', 'fa-sliders',      'Cấu hình'],
     ['audit',    'fa-clock-rotate-left', 'Nhật ký']
   ];
@@ -797,8 +1095,18 @@
         <i class="fa-solid ${x[1]} mr-2"></i>${x[2]}
       </button>`).join('');
 
-    const show = tab === 'edit' ? editSub : tab;          // khối nội dung đang hiện
-    [...TABS.map(x => x[0]), ...EDIT_SUBS.map(x => x[0])].forEach(id => {
+    const sn = document.getElementById('stockNav');
+    sn.classList.toggle('hidden', tab !== 'stock');
+    sn.innerHTML = STOCK_SUBS.map(x => `
+      <button data-s="${x[0]}" onclick="setStockSub(this.dataset.s)"
+        class="chip ${stockSub === x[0] ? 'active' : ''} px-4 py-2 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500 transition">
+        <i class="fa-solid ${x[1]} mr-2"></i>${x[2]}
+      </button>`).join('');
+
+    let show = tab;                                        // khối nội dung đang hiện
+    if (tab === 'edit') show = editSub;
+    else if (tab === 'stock') show = stockSub === 'bep' ? 'inv' : stockSub;   // 'pv' / 'recipe' / 'moves' trùng tên khối v-xxx
+    [...TABS.map(x => x[0]), ...EDIT_SUBS.map(x => x[0]), 'inv', 'pv', 'recipe', 'moves'].forEach(id => {
       const el = document.getElementById('v-' + id);
       if (el) el.classList.toggle('hidden', id !== show);
     });
@@ -812,6 +1120,10 @@
     if (show === 'booking')  loadBooking();
     if (show === 'tables')   loadTables();
     if (show === 'packages') loadPackages();
+    if (show === 'inv')      loadInv();
+    if (show === 'recipe')   loadRecipeDishes();
+    if (show === 'pv')       loadPv();
+    if (show === 'moves')    loadMoves();
     if (show === 'settings') loadSettings();
     if (show === 'audit')    loadAudit();
   }
@@ -1647,7 +1959,7 @@
     renderPkDays();
   }
   function onPkPrice() {
-    // tên dạng "Buffet 199K" thì tự đổi theo giá, trừ khi bạn đã tự sửa tên
+    // tên dạng "Buffet 219K" thì tự đổi theo giá, trừ khi bạn đã tự sửa tên
     if (pkNameTouched) return;
     const p = PK.packages.find(x => x.id === editPkId);
     const v = Number(document.getElementById('pkPrice').value);
@@ -1774,7 +2086,22 @@
     renderCfgDays();
     cfgExample();
   }
+  async function loadPayment() {
+    const p = await api('/api/manager/payment');
+    document.getElementById('pyBank').value = p.bank_id || '';
+    document.getElementById('pyAcc').value = p.account || '';
+    document.getElementById('pyHolder').value = p.holder || '';
+  }
+  async function savePayment() {
+    const r = await api('/api/manager/payment', {
+      bank_id: document.getElementById('pyBank').value,
+      account: document.getElementById('pyAcc').value,
+      holder: document.getElementById('pyHolder').value });
+    if (!r.success) { formErr('pyErr', r.message || 'Không lưu được'); return; }
+    formErr('pyErr', ''); toast('Đã lưu tài khoản nhận chuyển khoản', true);
+  }
   async function loadSettings() {
+    loadPayment();
     const r = await api('/api/manager/settings');
     if (!r.settings) return;
     formErr('cfErr', '');
@@ -1818,6 +2145,360 @@
     fillSettings(r.settings);
     toast('Đã khôi phục mặc định', true);
   }
+
+
+  // ============ KHO ============
+  const STOCK_SUBS = [
+    ['bep',    'fa-box-open',       'Kho bếp (nguyên liệu)'],
+    ['pv',     'fa-bell-concierge', 'Kho phục vụ'],
+    ['recipe', 'fa-scale-balanced', 'Định lượng món'],
+    ['moves',  'fa-clipboard-list', 'Sổ kho']
+  ];
+  let stockSub = 'bep';
+  const invWh = () => 'BEP';
+  function setStockSub(s) { stockSub = s; setTab('stock'); }
+  const fq = n => Number(n || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+  let mvTimer = null;
+
+  // ----- Kho phục vụ -----
+  let PV = null, pvGroup = '', pvEditId = null, pvMoveItem = null;
+  async function loadPv() {
+    const r = await api('/api/manager/pv');
+    if (!r.items) return;
+    PV = r;
+    if (!document.getElementById('pvDay').value) document.getElementById('pvDay').value = iso(new Date());
+    document.getElementById('pvGroup').innerHTML = r.groups.map(g => `<option value="${esc(g.ma_nhom)}">${esc(g.ten_nhom)}</option>`).join('');
+    renderPv();
+    loadPvDay();
+  }
+  function pvSetGroup(g) { pvGroup = g; renderPv(); }
+  function renderPv() {
+    if (!PV) return;
+    const s = PV.summary;
+    document.getElementById('pvCards').innerHTML =
+      card('Số vật tư', s.count) + card('Sắp hết', s.low, '', s.low ? 'text-amber-300' : 'text-white') +
+      card('Hết hàng / chưa nhập', s.out, '', s.out ? 'text-red-400' : 'text-white') + card('Tự trừ khi chốt ngày', s.auto);
+    document.getElementById('pvGroups').innerHTML = [['', 'Tất cả']].concat(PV.groups.map(g => [g.ma_nhom, g.ten_nhom])).map(g => `
+      <button data-g="${esc(g[0])}" onclick="pvSetGroup(this.dataset.g)"
+        class="chip ${pvGroup === g[0] ? 'active' : ''} px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500 transition">${esc(g[1])}</button>`).join('');
+    const q = document.getElementById('pvSearch').value.trim().toLowerCase();
+    const low = document.getElementById('pvLowOnly').checked;
+    const rows = PV.items.filter(i => (!pvGroup || i.ma_nhom === pvGroup) && (!low || (i.dang_dung && (i.low || i.out))) &&
+      (!q || i.ten_vt.toLowerCase().includes(q) || i.ma_vt.toLowerCase().includes(q)));
+    document.getElementById('pvBody').innerHTML = rows.map(i => {
+      const st = i.out ? 'text-red-400' : i.low ? 'text-amber-300' : 'text-white';
+      const tag = !i.dang_dung ? badge('Đã tắt', 'bg-slate-800 text-slate-400')
+        : i.out ? badge(i.so_luong < 0 ? 'Âm kho' : 'Hết', 'bg-red-950 text-red-300')
+        : i.low ? badge('Sắp hết', 'bg-amber-950 text-amber-300') : '';
+      const upd = i.ma_update === 1
+        ? badge('Tự trừ ' + fq(i.dinh_muc) + (i.kieu_tru === 'KHACH' ? '/khách' : '/ngày'), 'bg-sky-950 text-sky-300')
+        : badge('Thủ công', 'bg-slate-800 text-slate-300');
+      return `<tr class="border-t border-slate-800 ${i.dang_dung ? '' : 'opacity-50'}">
+        <td class="px-4 py-3 text-slate-400 whitespace-nowrap">${esc(i.ma_vt)}</td>
+        <td class="px-4 py-3"><span class="font-bold text-white">${esc(i.ten_vt)}</span> ${tag}
+          <p class="text-[11px] text-slate-500">${esc(i.ten_nhom)}${i.ghi_chu ? ' · ' + esc(i.ghi_chu) : ''}</p></td>
+        <td class="px-4 py-3 text-right font-black ${st} whitespace-nowrap">${fq(i.so_luong)} <span class="text-xs font-normal text-slate-400">${esc(i.dvt)}</span></td>
+        <td class="px-4 py-3 text-right text-slate-400">${fq(i.ton_toi_thieu)}</td>
+        <td class="px-4 py-3">${upd}</td>
+        <td class="px-4 py-3"><div class="flex flex-wrap justify-end gap-1.5">
+          <button data-id="${esc(i.ma_vt)}" data-k="IN" onclick="openPvMove(this.dataset.id, this.dataset.k)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${B_GREEN}">Nhập</button>
+          <button data-id="${esc(i.ma_vt)}" data-k="ADJUST" onclick="openPvMove(this.dataset.id, this.dataset.k)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${B_GRAY}">Kiểm kê</button>
+          ${btn('Sửa', B_GRAY, 'openPvItem', i.ma_vt)}
+          ${btn(i.dang_dung ? 'Tắt' : 'Bật', i.dang_dung ? B_GRAY : B_GREEN, 'togglePvItem', i.ma_vt)}
+          ${btn('Xoá', B_RED, 'delPvItem', i.ma_vt)}
+        </div></td></tr>`;
+    }).join('') || '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">Không có vật tư nào.</td></tr>';
+    document.getElementById('pvFoot').textContent = rows.length + ' vật tư. Vật tư tồn 0 mà chưa nhập số thật sẽ báo “Hết”: hãy Kiểm kê để điền số đang có.';
+  }
+  async function loadPvDay() {
+    const r = await api('/api/manager/pv/day?date=' + document.getElementById('pvDay').value);
+    if (r.suggest === undefined) return;
+    const g = document.getElementById('pvGuests');
+    g.value = r.saved !== null ? r.saved : (r.suggest || '');
+    document.getElementById('pvDayInfo').textContent =
+      (r.saved !== null ? 'Đã lưu ' + r.saved + ' khách. ' : (r.suggest ? 'Gợi ý ' + r.suggest + ' khách (cộng từ hoá đơn đã thanh toán). ' : 'Chưa có hoá đơn thanh toán trong ngày này. ')) +
+      (r.done ? 'Ngày này đã trừ ' + r.done + '/' + r.auto + ' vật tư tự trừ; chốt lại chỉ trừ phần còn thiếu.' : 'Ngày này chưa chốt (' + r.auto + ' vật tư tự trừ).');
+  }
+  async function doChot() {
+    const day = document.getElementById('pvDay').value, k = document.getElementById('pvGuests').value;
+    if (!k) { toast('Hãy nhập số khách trong ngày', false); return; }
+    if (!confirm('Chốt ngày ' + day.split('-').reverse().join('/') + ' với ' + k + ' khách và tự trừ kho?')) return;
+    const r = await api('/api/manager/pv/chot', { date: day, so_khach: k });
+    if (!r.success) { toast(r.message || 'Không chốt được', false); return; }
+    toast(r.trimmed ? 'Đã trừ ' + r.trimmed + ' vật tư' : 'Ngày này đã chốt đủ, không có gì để trừ thêm', true);
+    loadPv();
+  }
+  function onPvMu() { document.getElementById('pvAutoBox').classList.toggle('hidden', document.getElementById('pvMu').value !== '1'); }
+  function openPvItem(id) {
+    const i = id ? PV.items.find(x => x.ma_vt === id) : null;
+    pvEditId = i ? i.ma_vt : null;
+    document.getElementById('pvTitle').textContent = i ? 'Sửa vật tư ' + i.ma_vt : 'Thêm vật tư';
+    document.getElementById('pvName').value = i ? i.ten_vt : '';
+    document.getElementById('pvGroup').value = i ? i.ma_nhom : (pvGroup || PV.groups[0].ma_nhom);
+    document.getElementById('pvGroupBox').classList.toggle('opacity-50', !!i);
+    document.getElementById('pvGroup').disabled = !!i;
+    document.getElementById('pvUnit').value = i ? i.dvt : 'cái';
+    document.getElementById('pvStock').value = '0';
+    document.getElementById('pvStockBox').classList.toggle('hidden', !!i);
+    document.getElementById('pvMin').value = i ? i.ton_toi_thieu : 0;
+    document.getElementById('pvMu').value = i ? i.ma_update : 2;
+    document.getElementById('pvKieu').value = i && i.kieu_tru ? i.kieu_tru : 'KHACH';
+    document.getElementById('pvDm').value = i && i.ma_update === 1 ? i.dinh_muc : '';
+    document.getElementById('pvNote').value = i ? (i.ghi_chu || '') : '';
+    onPvMu(); formErr('pvErr');
+    showM('pvItemModal');
+    document.getElementById('pvName').focus();
+  }
+  async function savePvItem() {
+    const body = { ten_vt: document.getElementById('pvName').value, dvt: document.getElementById('pvUnit').value,
+      ton_toi_thieu: document.getElementById('pvMin').value, ghi_chu: document.getElementById('pvNote').value,
+      ma_update: document.getElementById('pvMu').value, kieu_tru: document.getElementById('pvKieu').value,
+      dinh_muc: document.getElementById('pvDm').value };
+    let url = '/api/manager/pv/new';
+    if (pvEditId) url = '/api/manager/pv/' + encodeURIComponent(pvEditId);
+    else { body.ma_nhom = document.getElementById('pvGroup').value; body.so_luong = document.getElementById('pvStock').value; }
+    const r = await api(url, body);
+    if (!r.success) { formErr('pvErr', r.message || 'Không lưu được'); return; }
+    hideM('pvItemModal');
+    toast(pvEditId ? 'Đã cập nhật vật tư' : 'Đã thêm vật tư (mã ' + r.ma_vt + ')', true);
+    loadPv();
+  }
+  async function togglePvItem(id) {
+    const i = PV.items.find(x => x.ma_vt === id);
+    const r = await api('/api/manager/pv/' + encodeURIComponent(id), { dang_dung: !i.dang_dung });
+    if (!r.success) { toast(r.message || 'Không đổi được', false); return; }
+    toast(i.dang_dung ? 'Đã tắt vật tư' : 'Đã bật lại vật tư', true);
+    loadPv();
+  }
+  async function delPvItem(id) {
+    const i = PV.items.find(x => x.ma_vt === id);
+    if (!confirm('Xoá "' + i.ten_vt + '" khỏi kho?')) return;
+    const r = await api('/api/manager/pv/' + encodeURIComponent(id) + '/delete', {});
+    if (!r.success) { toast(r.message || 'Không xoá được', false); return; }
+    toast('Đã xoá vật tư', true);
+    loadPv();
+  }
+  function openPvMove(id, kind) {
+    const i = PV.items.find(x => x.ma_vt === id);
+    pvMoveItem = i;
+    document.getElementById('pmTitle').textContent = i.ten_vt;
+    document.getElementById('pmCur').textContent = 'Đang tồn: ' + fq(i.so_luong) + ' ' + i.dvt;
+    document.getElementById('pmKind').value = kind;
+    document.getElementById('pmQty').value = '';
+    document.getElementById('pmNote').value = '';
+    onPmKind(); formErr('pmErr');
+    showM('pvMoveModal');
+    document.getElementById('pmQty').focus();
+  }
+  function onPmKind() {
+    const k = document.getElementById('pmKind').value;
+    document.getElementById('pmQtyLbl').textContent = (k === 'ADJUST' ? 'Số lượng đếm được thực tế' : 'Số lượng nhập thêm') + ' (' + (pvMoveItem ? pvMoveItem.dvt : '') + ')';
+  }
+  async function savePvMove() {
+    const r = await api('/api/manager/pv/' + encodeURIComponent(pvMoveItem.ma_vt) + '/move', {
+      kind: document.getElementById('pmKind').value, qty: document.getElementById('pmQty').value, note: document.getElementById('pmNote').value });
+    if (!r.success) { formErr('pmErr', r.message || 'Không lưu được'); return; }
+    hideM('pvMoveModal');
+    toast('Đã ghi phiếu. Tồn mới: ' + fq(r.stock) + ' ' + pvMoveItem.dvt, true);
+    loadPv();
+  }
+
+  let INV = null, invEditId = null, mvItem = null;
+
+  async function loadInv() {
+    document.getElementById('invTitleH').textContent = 'Kho bếp — nguyên liệu';
+    document.getElementById('invHint').textContent =
+      'Bếp cũng tự theo dõi kho này trên màn hình Bếp. Nguyên liệu tự trừ khi bếp bấm XONG món (cần khai báo ở "Định lượng món"). Hàng dưới mức cảnh báo báo vàng, hết hàng báo đỏ.';
+    const r = await api('/api/manager/inventory?wh=' + invWh());
+    if (!r.items) return;
+    INV = r;
+    renderInv();
+  }
+
+  function renderInv() {
+    if (!INV) return;
+    const s = INV.summary;
+    document.getElementById('invCards').innerHTML =
+      card('Số mặt hàng', s.count) + card('Sắp hết', s.low, '', s.low ? 'text-amber-300' : 'text-white') +
+      card('Hết hàng', s.out, '', s.out ? 'text-red-400' : 'text-white') + card('Giá trị tồn', money(s.value));
+    const q = document.getElementById('invSearch').value.trim().toLowerCase();
+    const low = document.getElementById('invLowOnly').checked;
+    const rows = INV.items.filter(i => (!q || i.name.toLowerCase().includes(q)) && (!low || (i.is_active && i.low)));
+    document.getElementById('invBody').innerHTML = rows.map(i => {
+      const st = i.stock <= 0 ? 'text-red-400' : i.low ? 'text-amber-300' : 'text-white';
+      const tag = !i.is_active ? badge('Đã tắt', 'bg-slate-800 text-slate-400')
+        : i.stock <= 0 ? badge(i.stock < 0 ? 'Âm kho' : 'Hết hàng', 'bg-red-950 text-red-300')
+        : i.low ? badge('Sắp hết', 'bg-amber-950 text-amber-300') : '';
+      return `<tr class="border-t border-slate-800 ${i.is_active ? '' : 'opacity-50'}">
+        <td class="px-4 py-3"><span class="font-bold text-white">${esc(i.name)}</span> ${tag}
+          ${i.used_in ? `<span class="text-[11px] text-slate-500 ml-1">dùng trong ${i.used_in} món</span>` : ''}</td>
+        <td class="px-4 py-3 text-right font-black ${st} whitespace-nowrap">${fq(i.stock)} <span class="text-xs font-normal text-slate-400">${esc(i.unit)}</span></td>
+        <td class="px-4 py-3 text-right text-slate-400">${fq(i.min_stock)}</td>
+        <td class="px-4 py-3 text-right text-slate-300">${money(i.cost)}</td>
+        <td class="px-4 py-3 text-right text-slate-300">${money(i.value)}</td>
+        <td class="px-4 py-3"><div class="flex flex-wrap justify-end gap-1.5">
+          <button data-id="${i.id}" data-k="IN" onclick="openMove(this.dataset.id, this.dataset.k)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${B_GREEN}">Nhập</button>
+          <button data-id="${i.id}" data-k="OUT" onclick="openMove(this.dataset.id, this.dataset.k)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${B_AMBER}">Xuất</button>
+          <button data-id="${i.id}" data-k="ADJUST" onclick="openMove(this.dataset.id, this.dataset.k)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${B_GRAY}">Kiểm kê</button>
+          ${btn('Sửa', B_GRAY, 'openInvItem', i.id)}
+          ${btn(i.is_active ? 'Tắt' : 'Bật', i.is_active ? B_GRAY : B_GREEN, 'toggleInvItem', i.id)}
+          ${btn('Xoá', B_RED, 'delInvItem', i.id)}
+        </div></td></tr>`;
+    }).join('') || '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">Không có mặt hàng nào.</td></tr>';
+    document.getElementById('invFoot').textContent = 'Tồn âm nghĩa là bếp đã làm nhiều hơn số đã nhập: hãy nhập bổ sung hoặc kiểm kê lại.';
+  }
+
+  function openInvItem(id) {
+    const i = id ? INV.items.find(x => String(x.id) === String(id)) : null;
+    invEditId = i ? i.id : null;
+    document.getElementById('ivTitle').textContent = i ? 'Sửa mặt hàng' : 'Thêm nguyên liệu';
+    document.getElementById('ivName').value = i ? i.name : '';
+    document.getElementById('ivUnit').value = i ? i.unit : 'kg';
+    document.getElementById('ivStock').value = '0';
+    document.getElementById('ivStockBox').classList.toggle('hidden', !!i);
+    document.getElementById('ivMin').value = i ? i.min_stock : 0;
+    document.getElementById('ivCost').value = i ? i.cost : 0;
+    formErr('ivErr');
+    showM('invItemModal');
+    document.getElementById('ivName').focus();
+  }
+
+  async function saveInvItem() {
+    const body = { name: document.getElementById('ivName').value, unit: document.getElementById('ivUnit').value,
+                   min_stock: document.getElementById('ivMin').value, cost: document.getElementById('ivCost').value };
+    let url = '/api/manager/inventory/new';
+    if (invEditId) url = '/api/manager/inventory/' + invEditId;
+    else { body.warehouse = invWh(); body.stock = document.getElementById('ivStock').value; }
+    const r = await api(url, body);
+    if (!r.success) { formErr('ivErr', r.message || 'Không lưu được'); return; }
+    hideM('invItemModal');
+    toast(invEditId ? 'Đã cập nhật mặt hàng' : 'Đã thêm mặt hàng', true);
+    loadInv();
+  }
+
+  async function toggleInvItem(id) {
+    const i = INV.items.find(x => String(x.id) === String(id));
+    const r = await api('/api/manager/inventory/' + id, { is_active: !i.is_active });
+    if (!r.success) { toast(r.message || 'Không đổi được', false); return; }
+    toast(i.is_active ? 'Đã tắt mặt hàng' : 'Đã bật lại mặt hàng', true);
+    loadInv();
+  }
+
+  async function delInvItem(id) {
+    const i = INV.items.find(x => String(x.id) === String(id));
+    if (!confirm('Xoá "' + i.name + '" khỏi kho? Lịch sử nhập xuất của mặt hàng này cũng bị xoá.')) return;
+    const r = await api('/api/manager/inventory/' + id + '/delete', {});
+    if (!r.success) { toast(r.message || 'Không xoá được', false); return; }
+    toast('Đã xoá mặt hàng', true);
+    loadInv();
+  }
+
+  function openMove(id, kind) {
+    const i = INV.items.find(x => String(x.id) === String(id));
+    mvItem = i;
+    document.getElementById('mvTitle').textContent = i.name;
+    document.getElementById('mvCur').textContent = 'Đang tồn: ' + fq(i.stock) + ' ' + i.unit;
+    document.getElementById('mvKind').value = kind;
+    document.getElementById('mvQty').value = '';
+    document.getElementById('mvNote').value = '';
+    onMvKind();
+    formErr('mvErr');
+    showM('moveModal');
+    document.getElementById('mvQty').focus();
+  }
+  function onMvKind() {
+    const k = document.getElementById('mvKind').value;
+    document.getElementById('mvQtyLbl').textContent = (k === 'ADJUST' ? 'Số lượng đếm được thực tế' : 'Số lượng') + ' (' + (mvItem ? mvItem.unit : '') + ')';
+  }
+  async function saveMove() {
+    const r = await api('/api/manager/inventory/' + mvItem.id + '/move', {
+      kind: document.getElementById('mvKind').value, qty: document.getElementById('mvQty').value,
+      note: document.getElementById('mvNote').value });
+    if (!r.success) { formErr('mvErr', r.message || 'Không lưu được'); return; }
+    hideM('moveModal');
+    toast('Đã ghi phiếu kho. Tồn mới: ' + fq(r.stock) + ' ' + mvItem.unit, true);
+    loadInv();
+  }
+
+  // ----- Định lượng món -----
+  let RC_DISHES = [], RC_ITEMS = [], rcDish = null;
+  async function loadRecipeDishes() {
+    const r = await api('/api/manager/inventory/dishes');
+    if (!r.dishes) return;
+    RC_DISHES = r.dishes;
+    renderRecipeDishes();
+  }
+  function renderRecipeDishes() {
+    const q = document.getElementById('rcSearch').value.trim().toLowerCase();
+    const miss = document.getElementById('rcMissing').checked;
+    const rows = RC_DISHES.filter(d => (!q || d.name.toLowerCase().includes(q)) && (!miss || !d.lines));
+    document.getElementById('rcBody').innerHTML = rows.map((d, idx) => `
+      <tr class="border-t border-slate-800">
+        <td class="px-4 py-2.5 font-bold text-white">${esc(d.name)}</td>
+        <td class="px-4 py-2.5 text-slate-400">${esc(d.category || '')}</td>
+        <td class="px-4 py-2.5 text-slate-400">${esc(d.kind)}</td>
+        <td class="px-4 py-2.5 text-center">${d.lines ? badge(d.lines + ' nguyên liệu', 'bg-emerald-950 text-emerald-300') : badge('Chưa có', 'bg-slate-800 text-slate-400')}</td>
+        <td class="px-4 py-2.5 text-right"><button data-n="${esc(d.name)}" onclick="openRecipe(this.dataset.n)" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ${B_GRAY}">Đặt định lượng</button></td>
+      </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">Không có món nào.</td></tr>';
+    document.getElementById('rcCount').textContent = rows.length + ' món · ' + RC_DISHES.filter(d => d.lines).length + '/' + RC_DISHES.length + ' món đã có định lượng';
+  }
+  async function openRecipe(name) {
+    rcDish = name;
+    const [it, rc] = await Promise.all([api('/api/manager/inventory?wh=BEP'), api('/api/manager/inventory/recipe?dish=' + encodeURIComponent(name))]);
+    RC_ITEMS = (it.items || []).filter(i => i.is_active);
+    document.getElementById('rcTitle').textContent = name;
+    document.getElementById('rcNone').classList.toggle('hidden', RC_ITEMS.length > 0);
+    document.getElementById('rcLines').innerHTML = '';
+    (rc.lines || []).forEach(l => rcAddLine(l.item_id, l.qty));
+    if (!(rc.lines || []).length && RC_ITEMS.length) rcAddLine();
+    formErr('rcErr');
+    showM('recipeModal');
+  }
+  function rcAddLine(itemId, qty) {
+    const wrap = document.getElementById('rcLines');
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-2';
+    div.innerHTML = `<select class="fld rc-item" onchange="rcUnit(this)">${RC_ITEMS.map(i =>
+        `<option value="${i.id}" data-u="${esc(i.unit)}" ${String(i.id) === String(itemId) ? 'selected' : ''}>${esc(i.name)}</option>`).join('')}</select>
+      <input class="fld rc-qty !w-24 shrink-0" inputmode="decimal" placeholder="SL" value="${qty !== undefined ? qty : ''}">
+      <span class="rc-u w-10 shrink-0 text-xs text-slate-400"></span>
+      <button onclick="this.parentNode.remove()" class="shrink-0 w-9 h-9 rounded-lg border border-slate-700 text-slate-400 hover:bg-red-700 hover:text-white"><i class="fa-solid fa-xmark"></i></button>`;
+    wrap.appendChild(div);
+    rcUnit(div.querySelector('select'));
+  }
+  function rcUnit(sel) {
+    const o = sel.options[sel.selectedIndex];
+    sel.parentNode.querySelector('.rc-u').textContent = o ? o.dataset.u : '';
+  }
+  async function saveRecipe() {
+    const lines = [...document.querySelectorAll('#rcLines > div')].map(d => ({
+      item_id: d.querySelector('.rc-item').value, qty: d.querySelector('.rc-qty').value }));
+    const r = await api('/api/manager/inventory/recipe', { dish_name: rcDish, lines });
+    if (!r.success) { formErr('rcErr', r.message || 'Không lưu được'); return; }
+    hideM('recipeModal');
+    toast('Đã lưu định lượng', true);
+    loadRecipeDishes();
+  }
+
+  // ----- Sổ kho -----
+  async function loadMoves() {
+    const r = await api('/api/manager/inventory/moves?wh=' + document.getElementById('mvWh').value +
+                        '&q=' + encodeURIComponent(document.getElementById('mvSearch').value.trim()));
+    if (!r.moves) return;
+    const col = { IN: 'text-emerald-300', OUT: 'text-amber-300', WASTE: 'text-red-300', ADJUST: 'text-sky-300', ORDER: 'text-slate-300', AUTO: 'text-sky-300' };
+    document.getElementById('mvBody').innerHTML = r.moves.map(m => `
+      <tr class="border-t border-slate-800 align-top">
+        <td class="px-4 py-2.5 text-slate-400 whitespace-nowrap">${esc(m.at)}</td>
+        <td class="px-4 py-2.5 text-slate-400">${m.warehouse === 'BEP' ? 'Bếp' : 'Phục vụ'}</td>
+        <td class="px-4 py-2.5 font-bold text-white">${esc(m.name)}</td>
+        <td class="px-4 py-2.5 font-bold ${col[m.kind] || ''}">${esc(m.label)}</td>
+        <td class="px-4 py-2.5 text-right font-bold ${m.qty < 0 ? 'text-red-300' : 'text-emerald-300'} whitespace-nowrap">${m.qty > 0 ? '+' : ''}${fq(m.qty)} ${esc(m.unit)}</td>
+        <td class="px-4 py-2.5 text-right text-slate-300 whitespace-nowrap">${m.balance_after === null ? '—' : fq(m.balance_after)}</td>
+        <td class="px-4 py-2.5 text-slate-400">${esc(m.note || '')}</td>
+      </tr>`).join('') || '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Chưa có phiếu kho nào.</td></tr>';
+    document.getElementById('mvCount').textContent = r.moves.length + ' dòng gần nhất' + (r.moves.length >= 200 ? ' (hiển thị 200 mới nhất, dùng ô tìm kiếm để lọc)' : '');
+  }
+
 
 
   // ============ NHẬT KÝ ============

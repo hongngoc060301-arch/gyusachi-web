@@ -76,7 +76,6 @@
       background: #450a0a;
     }
   </style>
-  <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
 </head>
 
 
@@ -774,9 +773,9 @@
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <button type="button" onclick="showBuffetMenu(199000,this)" class="buffet-card bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500 transition text-center">
+          <button type="button" onclick="showBuffetMenu(219000,this)" class="buffet-card bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500 transition text-center">
             <span class="text-slate-300 font-bold">BUFFET</span>
-            <span class="block text-2xl text-red-500 font-black mt-2">199.000đ</span>
+            <span class="block text-2xl text-red-500 font-black mt-2">219.000đ</span>
           </button>
           <button type="button" onclick="showBuffetMenu(269000,this)" class="buffet-card bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500 transition text-center">
             <span class="text-slate-300 font-bold">BUFFET</span>
@@ -800,7 +799,7 @@
           </button>
         </div>
 
-                <!-- SPECIAL MENU: nằm riêng bên dưới các mức giá -->
+        <!-- SPECIAL MENU: nằm riêng bên dưới các mức giá -->
         <button type="button" onclick="showSpecialMenu(this)"
           class="buffet-card mt-4 w-full rounded-2xl border border-amber-500/60 bg-gradient-to-r from-red-950 via-red-900 to-red-950 p-6 text-center hover:border-amber-400 hover:-translate-y-0.5 transition">
           <span class="block text-xs font-bold tracking-[0.4em] text-amber-300">
@@ -1139,6 +1138,7 @@
         <div
           onclick="openPinModal('{{ s.name }}', '{{ s.id }}')"
           class="bg-slate-900 border border-slate-800 hover:border-amber-500 rounded-2xl p-6 flex flex-col items-center cursor-pointer transition transform hover:-translate-y-1 shadow-lg">
+
 
           <img
             src="{{ s.avatar or '' }}"
@@ -1650,7 +1650,7 @@ function enterEmployee() {
       }
     }
 
-    // Special Menu: ảnh nằm trong static/images/menu/special/
+// Special Menu: ảnh nằm trong static/images/menu/special/
 async function showSpecialMenu(card) {
   document.querySelectorAll('.buffet-card').forEach(function(item) {
     item.classList.remove('selected');
@@ -1694,7 +1694,7 @@ async function showSpecialMenu(card) {
 }
 
 async function showBuffetMenu(price, card) {
-  document.getElementById('buffetMenuLabel').textContent = 'MENU GÓI';   // <-- dòng thêm
+  document.getElementById('buffetMenuLabel').textContent = 'MENU GÓI';
   document.querySelectorAll('.buffet-card').forEach(function(item) {
     item.classList.remove('selected');
   });
@@ -1725,8 +1725,8 @@ async function showBuffetMenu(price, card) {
       return;
     }
 
-     // Chỉ menu 199K là khổ A4 ngang
-    const isLandscape = (price === 199000);
+     // Chỉ menu 219K là khổ A4 ngang
+    const isLandscape = (price === 219000);
 
     // Đổi lưới theo từng loại
     foodList.className = isLandscape

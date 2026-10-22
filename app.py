@@ -29,7 +29,7 @@ def natural_key(name):
 # Thứ tự hiển thị các nhóm món (giống thứ tự trong menu giấy)
 CATEGORY_ORDER = [
     'Khai vị', 'Salad', 'Kim chi', 'Thịt nướng', 'Set Thịt Nướng', 'Hải sản nướng',
-    'Sushi', 'Sashimi', 'Lẩu', 'Cơm', 'Pizza', 'Mì', 'Món ăn thêm', 'Soup',
+    'Sushi', 'Sashimi', 'Lẩu', 'Topping lẩu', 'Cơm', 'Pizza', 'Mì', 'Món ăn thêm', 'Soup',
     'Topping', 'Special', 'Tráng miệng', 'Combo',
     'Soda', 'Nước trái cây', 'Cocktail', 'Trà', 'Nước ngọt', 'Rượu', 'Bia', 'Thức uống',
 ]
@@ -212,7 +212,7 @@ def list_images(folder):
 @app.route('/api/menu-images/<int:price>')
 def menu_images(price):
 
-    if price not in {199, 269, 299, 349, 389, 469}:
+    if price not in {219, 269, 299, 349, 389, 469}:
         return jsonify({"images": []}), 404
 
     folder = Path(app.static_folder) / "images" / "menu" / str(price)
@@ -328,8 +328,8 @@ def api_menu_alacarte():
     """Món gọi lẻ (có giá), gồm cả thức uống, set thịt và combo."""
     rows = [dict(r) for r in query("""
         SELECT id, name, category, price::int AS price
-        FROM alacarte_items WHERE is_active ORDER BY id
-    """)]
+        FROM alacarte_items WHERE is_active {drink_only} ORDER BY id
+    """.format(drink_only="AND station_code = 'ST01'" if request.args.get('drinks') else ''))]
 
     parts_by_combo = {}
     for p in query("""
@@ -364,7 +364,7 @@ def order_detail(order_id):
         return None
 
     items = query("""
-        SELECT id, parent_id, kind, name, station_id, qty, unit_price, status, note,
+        SELECT id, parent_id, kind, name, station_id, qty, unit_price, status, note, source,
                to_char(created_at, 'HH24:MI') AS time
         FROM order_items WHERE order_id = %s ORDER BY id
     """, (order_id,))
@@ -516,6 +516,16 @@ def api_add_items(order_id):
 
     if not items:
         return fail("Chưa chọn món nào.")
+    if data.get('source') == 'QR':
+        # Khách tự gọi: chỉ món trong buffet và nước lẻ (quầy bar ST01); món lẻ khác gọi nhân viên
+        for it in items:
+            if it.get('type') == 'PACKAGE':
+                continue
+            ok = it.get('type') == 'ALACARTE' and query(
+                "SELECT 1 FROM alacarte_items WHERE id = %s AND station_code = 'ST01' AND is_active",
+                (it.get('id'),), one=True)
+            if not ok:
+                return fail("Món này vui lòng bấm 'Gọi nhân viên' để được phục vụ.")
 
     try:
         with transaction() as cur:
@@ -528,6 +538,8 @@ def api_add_items(order_id):
                 raise OrderError("Đơn này đã kết thúc.")
 
             package_ids = [p for p in (order['package_id'], order['drink_package_id']) if p]
+            cur.execute("SELECT COALESCE(MAX(id), 0) AS m FROM order_items")
+            first_new = cur.fetchone()['m']
 
             for it in items:
                 try:
@@ -603,6 +615,9 @@ def api_add_items(order_id):
 
                 else:
                     raise OrderError("Loại món không hợp lệ.")
+
+            if data.get('source') == 'QR':               # khách tự gọi qua mã QR ở bàn
+                cur.execute("UPDATE order_items SET source = 'QR' WHERE order_id = %s AND id > %s", (order_id, first_new))
 
     except OrderError as e:
         return fail(str(e))
@@ -685,6 +700,8 @@ def api_kitchen_status(item_id):
             RETURNING id
         """, (new_status, item_id, station_id, flow[new_status]))
         done = cur.fetchone()
+        if done and new_status == 'DONE':
+            deduct_stock_for_item(cur, item_id)          # trừ nguyên liệu theo định lượng (nếu món có định lượng)
 
     if not done:
         return fail("Món đã đổi trạng thái hoặc bị huỷ, hãy tải lại.", 409)
@@ -883,12 +900,17 @@ def api_cashier_logout():
 def api_cashier_orders():
     """Các bàn đang có khách + tạm tính."""
     out = []
+    try:
+        billing = {r['table_id'] for r in query("SELECT table_id FROM service_calls WHERE status = 'OPEN' AND kind = 'BILL'")}
+    except Exception:                                  # chưa chạy file 22
+        billing = set()
     for r in query("SELECT id FROM orders WHERE status = 'OPEN' ORDER BY created_at"):
         o, items = load_order_for_bill(r['id'])
         b = compute_bill(o, items)
         out.append({"id": o['id'], "table_id": o['table_id'], "guests": o['guests'],
                     "opened_at": o['opened_at'], "package_name": o['package_name'],
-                    "total": b['total'], "pending": pending_count(items)})
+                    "total": b['total'], "pending": pending_count(items),
+                    "bill_requested": o['table_id'] in billing})
     return jsonify({"orders": out})
 
 
@@ -1315,13 +1337,13 @@ def vnd(n):
     return f"{int(n):,}đ".replace(',', '.')
 
 
-def audit(action, target='', detail=''):
+def audit(action, target='', detail='', actor='Quản lí'):
     """Ghi nhật ký. Lỗi ghi nhật ký (VD chưa chạy file 18) không bao giờ làm hỏng thao tác chính."""
     g.audited = True
     try:
         with transaction() as cur:
-            cur.execute("INSERT INTO audit_log (actor, action, target, detail) VALUES ('Quản lí', %s, %s, %s)",
-                        (str(action)[:100], str(target)[:200], str(detail)[:500]))
+            cur.execute("INSERT INTO audit_log (actor, action, target, detail) VALUES (%s, %s, %s, %s)",
+                        (str(actor)[:50], str(action)[:100], str(target)[:200], str(detail)[:500]))
     except Exception:
         pass
 
@@ -2217,6 +2239,706 @@ def api_manager_package(pid):
 
 
 # =========================================================
+# 8E. KHO PHỤC VỤ + KHO BẾP (cần chạy file 19_kho_phuc_vu.sql)
+# =========================================================
+
+def num(v, field, minimum=0, maximum=10_000_000):
+    """Đọc số (cho phép dấu phẩy thập phân kiểu Việt Nam)."""
+    try:
+        x = float(str(v).strip().replace(',', '.'))
+    except (TypeError, ValueError):
+        raise OrderError(f"{field} phải là một số.")
+    if x != x or x < minimum or x > maximum:
+        raise OrderError(f"{field} không hợp lệ.")
+    return round(x, 2)
+
+
+def parse_day(s):
+    try:
+        return datetime.strptime(str(s), '%Y-%m-%d').date()
+    except ValueError:
+        raise OrderError("Ngày không hợp lệ.")
+
+
+WAREHOUSES = ('BEP',)          # kho phục vụ có bảng riêng (kho_phuc_vu) ở phần bên dưới
+MOVE_LABEL = {'IN': 'Nhập kho', 'OUT': 'Xuất kho', 'WASTE': 'Hao hụt / hỏng', 'ADJUST': 'Kiểm kê', 'ORDER': 'Trừ theo món'}
+
+
+def deduct_stock_for_item(cur, item_id):
+    """Bếp bấm XONG một món -> trừ nguyên liệu theo định lượng. Chưa chạy file 19 hoặc món chưa có định lượng thì bỏ qua,
+    không bao giờ làm hỏng thao tác của bếp. Kho có thể xuống số âm (báo đỏ để quản lí kiểm kê), không chặn bếp."""
+    try:
+        cur.execute("SAVEPOINT stock_sp")
+        cur.execute("SELECT name, qty FROM order_items WHERE id = %s", (item_id,))
+        it = cur.fetchone()
+        if not it:
+            cur.execute("RELEASE SAVEPOINT stock_sp")
+            return
+        cur.execute("""
+            SELECT r.item_id, r.qty * %s AS used, i.name
+            FROM recipes r JOIN inventory_items i ON i.id = r.item_id
+            WHERE r.dish_name = %s""", (it['qty'], it['name']))
+        for r in cur.fetchall():
+            cur.execute("UPDATE inventory_items SET stock = stock - %s WHERE id = %s RETURNING stock", (r['used'], r['item_id']))
+            bal = cur.fetchone()['stock']
+            cur.execute("""INSERT INTO stock_moves (item_id, kind, qty, balance_after, note, actor)
+                           VALUES (%s, 'ORDER', %s, %s, %s, 'Bếp')""",
+                        (r['item_id'], -r['used'], bal, f"{it['name']} x{it['qty']}"))
+        cur.execute("RELEASE SAVEPOINT stock_sp")
+    except Exception:
+        try:
+            cur.execute("ROLLBACK TO SAVEPOINT stock_sp")
+        except Exception:
+            pass
+
+
+def inv_row(r):
+    d = dict(r)
+    for k in ('stock', 'min_stock'):
+        d[k] = float(d[k])
+    d['low'] = d['stock'] <= d['min_stock']
+    d['value'] = round(d['stock'] * d['cost']) if d['stock'] > 0 else 0
+    return d
+
+
+@app.route('/api/manager/inventory')
+def api_manager_inventory():
+    wh = request.args.get('wh', 'BEP')
+    if wh not in WAREHOUSES:
+        return fail("Kho không hợp lệ.")
+    rows = query("""
+        SELECT i.id, i.name, i.unit, i.stock, i.min_stock, i.cost, i.is_active,
+               (SELECT COUNT(*) FROM recipes r WHERE r.item_id = i.id)::int AS used_in
+        FROM inventory_items i WHERE i.warehouse = %s ORDER BY i.name""", (wh,))
+    items = [inv_row(r) for r in rows]
+    act = [i for i in items if i['is_active']]
+    return jsonify({"items": items, "summary": {
+        "count": len(act), "low": sum(1 for i in act if i['low'] and i['stock'] > 0),
+        "out": sum(1 for i in act if i['stock'] <= 0), "value": sum(i['value'] for i in act)}})
+
+
+@app.route('/api/manager/inventory/new', methods=['POST'])
+def api_manager_inventory_new():
+    data = request.get_json() or {}
+    try:
+        wh = data.get('warehouse')
+        if wh not in WAREHOUSES:
+            raise OrderError("Kho không hợp lệ.")
+        name = clean_name(data.get('name'), 120)
+        unit = clean_name(data.get('unit'), 20)
+        stock = num(data.get('stock', 0), "Số lượng tồn")
+        min_stock = num(data.get('min_stock', 0), "Mức cảnh báo")
+        cost = int(num(data.get('cost', 0), "Giá vốn"))
+        with transaction() as cur:
+            cur.execute("SELECT 1 FROM inventory_items WHERE warehouse = %s AND lower(name) = lower(%s)", (wh, name))
+            if cur.fetchone():
+                raise OrderError("Kho này đã có mặt hàng cùng tên.")
+            cur.execute("""INSERT INTO inventory_items (warehouse, name, unit, stock, min_stock, cost)
+                           VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""", (wh, name, unit, stock, min_stock, cost))
+            new_id = cur.fetchone()['id']
+            if stock > 0:
+                cur.execute("""INSERT INTO stock_moves (item_id, kind, qty, balance_after, note)
+                               VALUES (%s, 'IN', %s, %s, 'Tồn đầu kỳ')""", (new_id, stock, stock))
+        audit('Thêm mặt hàng kho ' + ('bếp' if wh == 'BEP' else 'phục vụ'), name, f"tồn {stock} {unit}")
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "id": new_id})
+
+
+@app.route('/api/manager/inventory/<int:item_id>', methods=['POST'])
+def api_manager_inventory_edit(item_id):
+    data = request.get_json() or {}
+    try:
+        with transaction() as cur:
+            cur.execute("SELECT id, warehouse, name FROM inventory_items WHERE id = %s FOR UPDATE", (item_id,))
+            it = cur.fetchone()
+            if not it:
+                raise OrderError("Không tìm thấy mặt hàng.")
+            sets, params = [], []
+            if 'name' in data:
+                nm = clean_name(data['name'], 120)
+                cur.execute("SELECT 1 FROM inventory_items WHERE warehouse = %s AND lower(name) = lower(%s) AND id <> %s",
+                            (it['warehouse'], nm, item_id))
+                if cur.fetchone():
+                    raise OrderError("Kho này đã có mặt hàng cùng tên.")
+                sets.append("name = %s"); params.append(nm)
+            if 'unit' in data:
+                sets.append("unit = %s"); params.append(clean_name(data['unit'], 20))
+            if 'min_stock' in data:
+                sets.append("min_stock = %s"); params.append(num(data['min_stock'], "Mức cảnh báo"))
+            if 'cost' in data:
+                sets.append("cost = %s"); params.append(int(num(data['cost'], "Giá vốn")))
+            if 'is_active' in data:
+                sets.append("is_active = %s"); params.append(bool(data['is_active']))
+            if not sets:
+                raise OrderError("Không có gì để cập nhật.")
+            cur.execute(f"UPDATE inventory_items SET {', '.join(sets)} WHERE id = %s", (*params, item_id))
+        audit('Sửa mặt hàng kho', it['name'], ', '.join(
+            f"{ {'name': 'tên', 'unit': 'đơn vị', 'min_stock': 'mức cảnh báo', 'cost': 'giá vốn', 'is_active': 'trạng thái'}[k] }: "
+            f"{('bật' if v else 'tắt') if isinstance(v, bool) else v}" for k, v in data.items()
+            if k in ('name', 'unit', 'min_stock', 'cost', 'is_active')))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True})
+
+
+@app.route('/api/manager/inventory/<int:item_id>/delete', methods=['POST'])
+def api_manager_inventory_delete(item_id):
+    with transaction() as cur:
+        cur.execute("SELECT id, name FROM inventory_items WHERE id = %s FOR UPDATE", (item_id,))
+        it = cur.fetchone()
+        if not it:
+            return fail("Không tìm thấy mặt hàng.", 404)
+        cur.execute("SELECT 1 FROM recipes WHERE item_id = %s LIMIT 1", (item_id,))
+        if cur.fetchone():
+            return fail("Nguyên liệu này đang nằm trong định lượng của món, hãy gỡ khỏi món trước (hoặc bấm TẮT để ẩn).")
+        cur.execute("SELECT 1 FROM stock_moves WHERE item_id = %s AND kind = 'ORDER' LIMIT 1", (item_id,))
+        if cur.fetchone():
+            return fail("Mặt hàng đã từng được trừ kho theo món nên giữ lại lịch sử, hãy bấm TẮT để ẩn.")
+        cur.execute("DELETE FROM inventory_items WHERE id = %s", (item_id,))
+    audit('Xoá mặt hàng kho', it['name'])
+    return jsonify({"success": True})
+
+
+def apply_stock_move(item_id, data, actor):
+    """Nhập / xuất / hao hụt / kiểm kê 1 nguyên liệu. Dùng chung cho Quản lí và Bếp. Trả (tên, đơn vị, delta, tồn mới, kind, note)."""
+    kind = data.get('kind')
+    if kind not in ('IN', 'OUT', 'WASTE', 'ADJUST'):
+        raise OrderError("Loại phiếu không hợp lệ.")
+    qty = num(data.get('qty'), "Số lượng", minimum=0)
+    if qty == 0 and kind != 'ADJUST':
+        raise OrderError("Số lượng phải lớn hơn 0.")
+    note = ' '.join(str(data.get('note') or '').split())[:200] or None
+    with transaction() as cur:
+        cur.execute("SELECT id, name, unit, stock, is_active FROM inventory_items WHERE id = %s FOR UPDATE", (item_id,))
+        it = cur.fetchone()
+        if not it:
+            raise OrderError("Không tìm thấy mặt hàng.")
+        old = float(it['stock'])
+        if kind == 'IN':
+            delta = qty
+        elif kind == 'ADJUST':
+            delta = round(qty - old, 2)
+        else:
+            delta = -qty
+            if old - qty < 0:
+                raise OrderError(f"Kho chỉ còn {old:g} {it['unit']}, không xuất/ghi hao hụt quá số đó được.")
+        new = round(old + delta, 2)
+        cur.execute("UPDATE inventory_items SET stock = %s WHERE id = %s", (new, item_id))
+        cur.execute("""INSERT INTO stock_moves (item_id, kind, qty, balance_after, note, actor)
+                       VALUES (%s, %s, %s, %s, %s, %s)""", (item_id, kind, delta, new, note, actor))
+    return it['name'], it['unit'], delta, new, kind, note
+
+
+@app.route('/api/manager/inventory/<int:item_id>/move', methods=['POST'])
+def api_manager_inventory_move(item_id):
+    """Nhập / xuất / hao hụt / kiểm kê. Với kiểm kê, qty là SỐ THỰC TẾ ĐẾM ĐƯỢC (kho sẽ đặt lại đúng số đó)."""
+    try:
+        name, unit, delta, new, kind, note = apply_stock_move(item_id, request.get_json() or {}, 'Quản lí')
+        audit(MOVE_LABEL[kind], name, f"{'+' if delta > 0 else ''}{delta:g} {unit} → tồn {new:g}" + (f" ({note})" if note else ''))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "stock": new})
+
+
+# ---------- Màn hình bếp tự theo dõi kho nguyên liệu (xác nhận bằng mã trạm bếp, giống màn hình nhận món) ----------
+
+def kitchen_station(station_id):
+    st = query("SELECT id, name FROM stations WHERE id = %s", (station_id,), one=True)
+    if not st:
+        raise OrderError("Không xác định được trạm bếp, hãy đăng nhập lại.")
+    return st
+
+
+@app.route('/api/kitchen/stock')
+def api_kitchen_stock():
+    try:
+        kitchen_station(request.args.get('station'))
+    except OrderError as e:
+        return fail(str(e), 403)
+    rows = query("""SELECT i.id, i.name, i.unit, i.stock, i.min_stock, 0 AS cost, i.is_active,
+                           (SELECT to_char(MAX(m.created_at), 'DD/MM HH24:MI') FROM stock_moves m
+                             WHERE m.item_id = i.id AND m.kind = 'ADJUST') AS last_count
+                    FROM inventory_items i WHERE i.warehouse = 'BEP' AND i.is_active ORDER BY i.name""")
+    items = [inv_row(r) for r in rows]
+    return jsonify({"items": items, "summary": {
+        "count": len(items), "low": sum(1 for i in items if i['low'] and i['stock'] > 0),
+        "out": sum(1 for i in items if i['stock'] <= 0)}})
+
+
+@app.route('/api/kitchen/stock/<int:item_id>/move', methods=['POST'])
+def api_kitchen_stock_move(item_id):
+    data = request.get_json() or {}
+    try:
+        st = kitchen_station(data.get('station_id'))
+        name, unit, delta, new, kind, note = apply_stock_move(item_id, data, st['name'])
+        audit(MOVE_LABEL[kind] + ' (bếp)', name, f"{'+' if delta > 0 else ''}{delta:g} {unit} → tồn {new:g}" + (f" ({note})" if note else ''),
+              actor=st['name'])
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "stock": new})
+
+
+@app.route('/api/kitchen/stock/count', methods=['POST'])
+def api_kitchen_stock_count():
+    """Kiểm kê cuối ngày: bếp gõ số đếm được cho nhiều nguyên liệu, lưu 1 lần. Ô để trống = không kiểm kê mặt hàng đó."""
+    data = request.get_json() or {}
+    try:
+        st = kitchen_station(data.get('station_id'))
+        counts = data.get('counts') or []
+        if not isinstance(counts, list) or not counts:
+            raise OrderError("Chưa nhập số lượng nào.")
+        done, diffs = 0, []
+        for c in counts:
+            name, unit, delta, new, kind, note = apply_stock_move(
+                int(c.get('item_id')), {'kind': 'ADJUST', 'qty': c.get('qty'), 'note': 'Kiểm kê cuối ngày'}, st['name'])
+            done += 1
+            if delta:
+                diffs.append(f"{name} {'+' if delta > 0 else ''}{delta:g} {unit}")
+        audit('Kiểm kê cuối ngày (bếp)', st['name'], f"{done} nguyên liệu" + (f"; lệch: {', '.join(diffs)}" if diffs else '; không lệch'),
+              actor=st['name'])
+    except (OrderError, TypeError, ValueError) as e:
+        return fail(str(e) if isinstance(e, OrderError) else "Dữ liệu kiểm kê không hợp lệ.")
+    return jsonify({"success": True, "counted": done, "diff": len(diffs)})
+
+
+@app.route('/api/kitchen/stock/new', methods=['POST'])
+def api_kitchen_stock_new():
+    """Bếp thêm nguyên liệu mới (giá vốn để 0, quản lí cập nhật sau)."""
+    data = request.get_json() or {}
+    try:
+        st = kitchen_station(data.get('station_id'))
+        name = clean_name(data.get('name'), 120)
+        unit = clean_name(data.get('unit'), 20)
+        stock = num(data.get('stock', 0), "Số lượng tồn")
+        min_stock = num(data.get('min_stock', 0), "Mức cảnh báo")
+        with transaction() as cur:
+            cur.execute("SELECT 1 FROM inventory_items WHERE warehouse = 'BEP' AND lower(name) = lower(%s)", (name,))
+            if cur.fetchone():
+                raise OrderError("Kho đã có nguyên liệu cùng tên.")
+            cur.execute("""INSERT INTO inventory_items (warehouse, name, unit, stock, min_stock, cost)
+                           VALUES ('BEP', %s, %s, %s, %s, 0) RETURNING id""", (name, unit, stock, min_stock))
+            new_id = cur.fetchone()['id']
+            if stock > 0:
+                cur.execute("""INSERT INTO stock_moves (item_id, kind, qty, balance_after, note, actor)
+                               VALUES (%s, 'IN', %s, %s, 'Tồn đầu kỳ', %s)""", (new_id, stock, stock, st['name']))
+        audit('Thêm nguyên liệu (bếp)', name, f"tồn {stock} {unit}", actor=st['name'])
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "id": new_id})
+
+
+@app.route('/api/manager/inventory/moves')
+def api_manager_inventory_moves():
+    """Sổ kho gộp: kho bếp (stock_moves) + kho phục vụ (lich_su_kho). wh = BEP | PHUCVU | rỗng (cả 2)."""
+    wh = request.args.get('wh', '')
+    q = (request.args.get('q') or '').strip()[:100]
+    like = f"%{q}%"
+    try:
+        limit = max(1, min(int(request.args.get('limit') or 200), 500))
+    except ValueError:
+        limit = 200
+    out = []
+    if wh in ('', 'BEP'):
+        for r in query("""
+            SELECT m.created_at, to_char(m.created_at, 'DD/MM/YYYY HH24:MI') AS at, i.name, i.unit,
+                   m.kind, m.qty, m.balance_after, m.note
+            FROM stock_moves m JOIN inventory_items i ON i.id = m.item_id
+            WHERE %s = '' OR i.name ILIKE %s OR m.note ILIKE %s
+            ORDER BY m.id DESC LIMIT %s""", (q, like, like, limit)):
+            d = dict(r); d['warehouse'] = 'BEP'; d['label'] = MOVE_LABEL.get(d['kind'], d['kind'])
+            d['qty'] = float(d['qty']); d['balance_after'] = float(d['balance_after']); out.append(d)
+    if wh in ('', 'PHUCVU'):
+        lab = {'NHAP': ('IN', 'Nhập kho'), 'XUAT_TU_DONG': ('AUTO', 'Tự trừ'), 'KIEM_KE': ('ADJUST', 'Kiểm kê')}
+        for r in query("""
+            SELECT l.created_at, to_char(l.created_at, 'DD/MM/YYYY HH24:MI') AS at, k.ten_vt AS name, k.dvt AS unit,
+                   l.loai, l.so_luong AS qty, l.ghi_chu AS note
+            FROM lich_su_kho l JOIN kho_phuc_vu k ON k.ma_vt = l.ma_vt
+            WHERE %s = '' OR k.ten_vt ILIKE %s OR l.ghi_chu ILIKE %s OR l.ma_vt ILIKE %s
+            ORDER BY l.id DESC LIMIT %s""", (q, like, like, like, limit)):
+            d = dict(r); d['kind'], d['label'] = lab.get(d['loai'], (d['loai'], d['loai'])); del d['loai']
+            d['warehouse'] = 'PHUCVU'; d['qty'] = float(d['qty']); d['balance_after'] = None; out.append(d)
+    out.sort(key=lambda x: x['created_at'], reverse=True)
+    out = out[:limit]
+    for d in out:
+        d['created_at'] = None
+    return jsonify({"moves": out})
+
+
+# ---------- Kho phục vụ (bảng kho_phuc_vu trong file 19) ----------
+
+PV_FIELDS = "k.ma_vt, k.ma_nhom, n.ten_nhom, k.ten_vt, k.dvt, k.so_luong, k.ton_toi_thieu, k.ma_update, k.kieu_tru, k.dinh_muc, k.ghi_chu, k.dang_dung"
+
+
+def pv_row(r):
+    d = dict(r)
+    for k in ('so_luong', 'ton_toi_thieu', 'dinh_muc'):
+        d[k] = float(d[k])
+    d['out'] = d['so_luong'] <= 0
+    d['low'] = (not d['out']) and d['ton_toi_thieu'] > 0 and d['so_luong'] <= d['ton_toi_thieu']
+    return d
+
+
+@app.route('/api/manager/pv')
+def api_manager_pv():
+    groups = query("SELECT ma_nhom, ten_nhom FROM nhom_hang ORDER BY ma_nhom")
+    rows = query(f"""SELECT {PV_FIELDS} FROM kho_phuc_vu k JOIN nhom_hang n ON n.ma_nhom = k.ma_nhom
+                     ORDER BY k.ma_nhom, k.ma_vt""")
+    items = [pv_row(r) for r in rows]
+    act = [i for i in items if i['dang_dung']]
+    return jsonify({"groups": [dict(g_) for g_ in groups], "items": items, "summary": {
+        "count": len(act), "low": sum(1 for i in act if i['low']), "out": sum(1 for i in act if i['out']),
+        "auto": sum(1 for i in act if i['ma_update'] == 1)}})
+
+
+def pv_auto_fields(data, cur_ma_update=None):
+    """Đọc cách cập nhật: ma_update 2 = thủ công, 1 = tự trừ (cần kieu_tru + định mức > 0)."""
+    mu = int(data.get('ma_update', cur_ma_update or 2))
+    if mu == 2:
+        return 2, None, 0
+    if mu != 1:
+        raise OrderError("Cách cập nhật chỉ nhận 1 (tự trừ) hoặc 2 (thủ công).")
+    kieu = data.get('kieu_tru')
+    if kieu not in ('KHACH', 'NGAY'):
+        raise OrderError("Tự trừ cần chọn trừ theo số khách hay theo ngày.")
+    dm = num(data.get('dinh_muc'), "Định mức", minimum=0, maximum=100000)
+    if dm <= 0:
+        raise OrderError("Tự trừ cần định mức lớn hơn 0.")
+    return 1, kieu, dm
+
+
+@app.route('/api/manager/pv/new', methods=['POST'])
+def api_manager_pv_new():
+    data = request.get_json() or {}
+    try:
+        nhom = str(data.get('ma_nhom') or '')
+        name = clean_name(data.get('ten_vt'), 150)
+        dvt = clean_name(data.get('dvt'), 20)
+        sl = num(data.get('so_luong', 0), "Số lượng tồn")
+        mn = num(data.get('ton_toi_thieu', 0), "Mức cảnh báo")
+        mu, kieu, dm = pv_auto_fields(data)
+        ghi = ' '.join(str(data.get('ghi_chu') or '').split())[:300] or None
+        with transaction() as cur:
+            cur.execute("SELECT 1 FROM nhom_hang WHERE ma_nhom = %s", (nhom,))
+            if not cur.fetchone():
+                raise OrderError("Hãy chọn nhóm hàng.")
+            cur.execute("SELECT 1 FROM kho_phuc_vu WHERE lower(ten_vt) = lower(%s)", (name,))
+            if cur.fetchone():
+                raise OrderError("Đã có vật tư cùng tên.")
+            cur.execute("SELECT COALESCE(MAX(substring(ma_vt from '[0-9]+$')::int), 0) + 1 AS n FROM kho_phuc_vu WHERE ma_nhom = %s", (nhom,))
+            ma = f"{nhom}-{cur.fetchone()['n']:03d}"
+            cur.execute("""INSERT INTO kho_phuc_vu (ma_vt, ma_nhom, ten_vt, dvt, so_luong, ton_toi_thieu, ma_update, kieu_tru, dinh_muc, ghi_chu)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", (ma, nhom, name, dvt, sl, mn, mu, kieu, dm, ghi))
+            if sl > 0:
+                cur.execute("INSERT INTO lich_su_kho (ma_vt, loai, so_luong, ghi_chu) VALUES (%s, 'NHAP', %s, 'Tồn đầu kỳ')", (ma, sl))
+        audit('Thêm vật tư kho phục vụ', name, f"mã {ma}, tồn {sl} {dvt}")
+    except (OrderError, TypeError, ValueError) as e:
+        return fail(str(e) if isinstance(e, OrderError) else "Dữ liệu không hợp lệ.")
+    return jsonify({"success": True, "ma_vt": ma})
+
+
+@app.route('/api/manager/pv/<ma_vt>', methods=['POST'])
+def api_manager_pv_edit(ma_vt):
+    data = request.get_json() or {}
+    try:
+        with transaction() as cur:
+            cur.execute("SELECT ma_vt, ten_vt, ma_update FROM kho_phuc_vu WHERE ma_vt = %s FOR UPDATE", (ma_vt,))
+            it = cur.fetchone()
+            if not it:
+                raise OrderError("Không tìm thấy vật tư.")
+            sets, params = [], []
+            if 'ten_vt' in data:
+                nm = clean_name(data['ten_vt'], 150)
+                cur.execute("SELECT 1 FROM kho_phuc_vu WHERE lower(ten_vt) = lower(%s) AND ma_vt <> %s", (nm, ma_vt))
+                if cur.fetchone():
+                    raise OrderError("Đã có vật tư cùng tên.")
+                sets.append("ten_vt = %s"); params.append(nm)
+            if 'dvt' in data:
+                sets.append("dvt = %s"); params.append(clean_name(data['dvt'], 20))
+            if 'ton_toi_thieu' in data:
+                sets.append("ton_toi_thieu = %s"); params.append(num(data['ton_toi_thieu'], "Mức cảnh báo"))
+            if 'ghi_chu' in data:
+                sets.append("ghi_chu = %s"); params.append(' '.join(str(data['ghi_chu'] or '').split())[:300] or None)
+            if 'dang_dung' in data:
+                sets.append("dang_dung = %s"); params.append(bool(data['dang_dung']))
+            if 'ma_update' in data:
+                mu, kieu, dm = pv_auto_fields(data)
+                sets += ["ma_update = %s", "kieu_tru = %s", "dinh_muc = %s"]; params += [mu, kieu, dm]
+            if not sets:
+                raise OrderError("Không có gì để cập nhật.")
+            sets.append("updated_at = NOW()")
+            cur.execute(f"UPDATE kho_phuc_vu SET {', '.join(sets)} WHERE ma_vt = %s", (*params, ma_vt))
+        audit('Sửa vật tư kho phục vụ', it['ten_vt'], ', '.join(k for k in data if k in
+              ('ten_vt', 'dvt', 'ton_toi_thieu', 'ghi_chu', 'dang_dung', 'ma_update', 'kieu_tru', 'dinh_muc')))
+    except (OrderError, TypeError, ValueError) as e:
+        return fail(str(e) if isinstance(e, OrderError) else "Dữ liệu không hợp lệ.")
+    return jsonify({"success": True})
+
+
+@app.route('/api/manager/pv/<ma_vt>/delete', methods=['POST'])
+def api_manager_pv_delete(ma_vt):
+    with transaction() as cur:
+        cur.execute("SELECT ten_vt FROM kho_phuc_vu WHERE ma_vt = %s FOR UPDATE", (ma_vt,))
+        it = cur.fetchone()
+        if not it:
+            return fail("Không tìm thấy vật tư.", 404)
+        cur.execute("SELECT 1 FROM lich_su_kho WHERE ma_vt = %s AND loai <> 'NHAP' LIMIT 1", (ma_vt,))
+        if cur.fetchone():
+            return fail("Vật tư này đã có lịch sử kiểm kê / tự trừ nên giữ lại, hãy bấm TẮT để ẩn.")
+        cur.execute("DELETE FROM lich_su_kho WHERE ma_vt = %s", (ma_vt,))
+        cur.execute("DELETE FROM kho_phuc_vu WHERE ma_vt = %s", (ma_vt,))
+    audit('Xoá vật tư kho phục vụ', it['ten_vt'])
+    return jsonify({"success": True})
+
+
+@app.route('/api/manager/pv/<ma_vt>/move', methods=['POST'])
+def api_manager_pv_move(ma_vt):
+    """kind = IN (nhập thêm, gọi hàm nhap_kho) | ADJUST (kiểm kê: đặt lại số thực tế, gọi hàm kiem_ke)."""
+    data = request.get_json() or {}
+    try:
+        kind = data.get('kind')
+        if kind not in ('IN', 'ADJUST'):
+            raise OrderError("Loại phiếu không hợp lệ.")
+        qty = num(data.get('qty'), "Số lượng", minimum=0)
+        if kind == 'IN' and qty <= 0:
+            raise OrderError("Số lượng nhập phải lớn hơn 0.")
+        note = ' '.join(str(data.get('note') or '').split())[:200] or None
+        with transaction() as cur:
+            cur.execute("SELECT ten_vt, dvt FROM kho_phuc_vu WHERE ma_vt = %s FOR UPDATE", (ma_vt,))
+            it = cur.fetchone()
+            if not it:
+                raise OrderError("Không tìm thấy vật tư.")
+            if kind == 'IN':
+                cur.execute("SELECT nhap_kho(%s, %s, %s)", (ma_vt, qty, note))
+            else:
+                cur.execute("SELECT kiem_ke(%s, %s, %s)", (ma_vt, qty, note))
+            cur.execute("SELECT so_luong FROM kho_phuc_vu WHERE ma_vt = %s", (ma_vt,))
+            new = float(cur.fetchone()['so_luong'])
+        audit('Nhập kho phục vụ' if kind == 'IN' else 'Kiểm kê kho phục vụ', it['ten_vt'],
+              f"{'+' if kind == 'IN' else '→ '}{qty:g} {it['dvt']}, tồn {new:g}" + (f" ({note})" if note else ''))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "stock": new})
+
+
+@app.route('/api/manager/pv/day')
+def api_manager_pv_day():
+    """Thông tin chốt ngày: số khách đã lưu, số khách gợi ý (từ hoá đơn đã thanh toán), ngày đó đã chốt chưa."""
+    try:
+        day = parse_day(request.args.get('date') or datetime.now().date().isoformat())
+    except OrderError as e:
+        return fail(str(e))
+    saved = query("SELECT so_khach FROM so_khach_ngay WHERE ngay = %s", (day,), one=True)
+    sug = query(f"SELECT COALESCE(SUM(o.guests), 0)::int AS n FROM orders o WHERE {PAID} AND o.paid_at::date = %s", (day,), one=True)['n']
+    done = query("SELECT COUNT(*)::int AS n FROM lich_su_kho WHERE ngay = %s AND loai = 'XUAT_TU_DONG'", (day,), one=True)['n']
+    auto = query("SELECT COUNT(*)::int AS n FROM kho_phuc_vu WHERE dang_dung AND ma_update = 1 AND dinh_muc > 0", one=True)['n']
+    return jsonify({"date": day.isoformat(), "saved": saved['so_khach'] if saved else None,
+                    "suggest": sug, "done": done, "auto": auto})
+
+
+@app.route('/api/manager/pv/chot', methods=['POST'])
+def api_manager_pv_chot():
+    """Nhập số khách rồi chốt ngày: tự trừ các vật tư ma_update = 1. Chốt lại cùng ngày không bị trừ đôi."""
+    data = request.get_json() or {}
+    try:
+        day = parse_day(data.get('date'))
+        if day > datetime.now().date():
+            raise OrderError("Chưa chốt được ngày trong tương lai.")
+        khach = int(num(data.get('so_khach'), "Số khách", minimum=0, maximum=100000))
+        with transaction() as cur:
+            cur.execute("""INSERT INTO so_khach_ngay (ngay, so_khach) VALUES (%s, %s)
+                           ON CONFLICT (ngay) DO UPDATE SET so_khach = EXCLUDED.so_khach""", (day, khach))
+            cur.execute("SELECT chot_ngay(%s) AS n", (day,))
+            n = cur.fetchone()['n']
+        audit('Chốt ngày kho phục vụ', day.strftime('%d/%m/%Y'), f"{khach} khách, trừ {n} vật tư")
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "trimmed": n})
+
+
+# ---------- Định lượng món ----------
+
+@app.route('/api/manager/inventory/dishes')
+def api_manager_inventory_dishes():
+    rows = query("""
+        SELECT name, category, kind, COALESCE(n, 0)::int AS lines FROM (
+            SELECT m.name, m.category, 'Buffet' AS kind FROM menu_items m WHERE m.is_active
+            UNION
+            SELECT a.name, a.category, 'Gọi lẻ' FROM alacarte_items a WHERE a.is_active
+            UNION
+            SELECT c.item_name, 'Món trong combo', 'Combo' FROM combo_details c
+        ) d LEFT JOIN (SELECT dish_name, COUNT(*) AS n FROM recipes GROUP BY dish_name) r ON r.dish_name = d.name
+        ORDER BY kind, category, name""")
+    seen, out = set(), []
+    for r in rows:                                    # một tên món chỉ hiện 1 lần
+        if r['name'] in seen:
+            continue
+        seen.add(r['name']); out.append(dict(r))
+    return jsonify({"dishes": out})
+
+
+@app.route('/api/manager/inventory/recipe')
+def api_manager_inventory_recipe():
+    dish = (request.args.get('dish') or '').strip()
+    rows = query("""SELECT r.item_id, i.name, i.unit, r.qty FROM recipes r JOIN inventory_items i ON i.id = r.item_id
+                    WHERE r.dish_name = %s ORDER BY i.name""", (dish,))
+    return jsonify({"lines": [{**dict(r), "qty": float(r['qty'])} for r in rows]})
+
+
+@app.route('/api/manager/inventory/recipe', methods=['POST'])
+def api_manager_inventory_recipe_save():
+    data = request.get_json() or {}
+    try:
+        dish = clean_name(data.get('dish_name'), 255)
+        lines = data.get('lines') or []
+        clean, seen = [], set()
+        for ln in lines:
+            iid = int(ln.get('item_id'))
+            if iid in seen:
+                raise OrderError("Một nguyên liệu chỉ nên xuất hiện 1 lần trong món.")
+            seen.add(iid)
+            clean.append((iid, num(ln.get('qty'), "Định lượng", minimum=0.001, maximum=100000)))
+        with transaction() as cur:
+            cur.execute("DELETE FROM recipes WHERE dish_name = %s", (dish,))
+            for iid, q in clean:
+                cur.execute("SELECT 1 FROM inventory_items WHERE id = %s AND warehouse = 'BEP'", (iid,))
+                if not cur.fetchone():
+                    raise OrderError("Chỉ chọn nguyên liệu của kho bếp.")
+                cur.execute("INSERT INTO recipes (dish_name, item_id, qty) VALUES (%s, %s, %s)", (dish, iid, q))
+        audit('Sửa định lượng món', dish, f"{len(clean)} nguyên liệu")
+    except (OrderError, TypeError, ValueError) as e:
+        return fail(str(e) if isinstance(e, OrderError) else "Dữ liệu định lượng không hợp lệ.")
+    return jsonify({"success": True})
+
+
+# =========================================================
+# 8F. KHÁCH QUÉT QR Ở BÀN: TỰ GỌI MÓN, GỌI NHÂN VIÊN, XIN TÍNH TIỀN (cần chạy file 20_qr_goi_nhan_vien.sql)
+# =========================================================
+
+@app.route('/ban/<table_id>')
+def table_self_order(table_id):
+    t = query("SELECT id, name FROM dining_tables WHERE id = %s AND is_active", (table_id.upper(),), one=True)
+    if not t:
+        return redirect(url_for('home'))
+    return render_template('goimon_ban.html', table=dict(t))
+
+
+@app.route('/api/service-call/status')
+def api_service_call_status():
+    """Trạng thái yêu cầu đang chờ của 1 bàn (để trang khách hiện 'đã gọi, nhân viên sẽ tới ngay')."""
+    rows = query("SELECT kind FROM service_calls WHERE table_id = %s AND status = 'OPEN'", (request.args.get('table_id'),))
+    return jsonify({"open": sorted({r['kind'] for r in rows})})
+
+
+@app.route('/api/service-call', methods=['POST'])
+def api_service_call():
+    """Khách bấm Gọi nhân viên (CALL) hoặc Xin tính tiền (BILL). Bấm lặp lại khi chưa ai xử lý thì không tạo thêm."""
+    data = request.get_json() or {}
+    kind = data.get('kind')
+    try:
+        if kind not in ('CALL', 'BILL'):
+            raise OrderError("Yêu cầu không hợp lệ.")
+        with transaction() as cur:
+            cur.execute("SELECT id FROM dining_tables WHERE id = %s AND is_active", (data.get('table_id'),))
+            if not cur.fetchone():
+                raise OrderError("Không tìm thấy bàn.")
+            cur.execute("SELECT id FROM orders WHERE table_id = %s AND status = 'OPEN'", (data['table_id'],))
+            o = cur.fetchone()
+            if kind == 'BILL' and not o:
+                raise OrderError("Bàn chưa có món nào để tính tiền.")
+            cur.execute("SELECT 1 FROM service_calls WHERE table_id = %s AND kind = %s AND status = 'OPEN'", (data['table_id'], kind))
+            if not cur.fetchone():
+                cur.execute("INSERT INTO service_calls (table_id, order_id, kind) VALUES (%s, %s, %s)",
+                            (data['table_id'], o['id'] if o else None, kind))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True})
+
+
+@app.route('/api/service-calls')
+def api_service_calls():
+    """Danh sách yêu cầu đang chờ (màn hình phục vụ). ?staff=ID để đánh dấu bàn do mình phụ trách."""
+    me = request.args.get('staff') or ''
+    rows = query("""
+        SELECT c.id, c.table_id, c.kind, to_char(c.created_at, 'HH24:MI') AS at,
+               EXTRACT(EPOCH FROM (NOW() - c.created_at))::int AS waiting,
+               o.staff_id, s.name AS staff_name
+        FROM service_calls c
+        LEFT JOIN orders o ON o.id = c.order_id
+        LEFT JOIN staffs s ON s.id = o.staff_id
+        WHERE c.status = 'OPEN' ORDER BY c.id""")
+    calls = [{**dict(r), "mine": bool(me) and r['staff_id'] == me} for r in rows]
+    return jsonify({"calls": calls})
+
+
+@app.route('/api/service-calls/<int:call_id>/done', methods=['POST'])
+def api_service_call_done(call_id):
+    data = request.get_json() or {}
+    who = query("SELECT name FROM staffs WHERE id = %s", (data.get('staff_id'),), one=True)
+    with transaction() as cur:
+        cur.execute("""UPDATE service_calls SET status = 'DONE', done_at = NOW(), done_by = %s
+                       WHERE id = %s AND status = 'OPEN' RETURNING id""", (who['name'] if who else None, call_id))
+        if not cur.fetchone():
+            return fail("Yêu cầu này đã được xử lý.", 409)
+    return jsonify({"success": True})
+
+
+@app.route('/qr-ban')
+def qr_print_page():
+    """Trang in mã QR cho từng bàn (chỉ quản lí)."""
+    if not manager_ok():
+        return redirect('/quanli')
+    return render_template('qr_ban.html')
+
+
+# ---------- Thanh toán chuyển khoản (mã VietQR ở màn hình thu ngân) ----------
+
+PAY_KEYS = ('cfg_bank_id', 'cfg_bank_account', 'cfg_bank_holder')
+
+
+def payment_config():
+    rows = {r['key']: r['value'] for r in query("SELECT key, value FROM app_settings WHERE key = ANY(%s)", (list(PAY_KEYS),))}
+    return {"bank_id": rows.get('cfg_bank_id', ''), "account": rows.get('cfg_bank_account', ''),
+            "holder": rows.get('cfg_bank_holder', '')}
+
+
+@app.route('/api/cashier/payment-config')
+def api_cashier_payment_config():
+    if not session.get('cashier'):
+        return fail("Chưa đăng nhập thu ngân.", 401)
+    return jsonify(payment_config())
+
+
+@app.route('/api/manager/payment')
+def api_manager_payment_get():
+    return jsonify(payment_config())
+
+
+@app.route('/api/manager/payment', methods=['POST'])
+def api_manager_payment_save():
+    data = request.get_json() or {}
+    try:
+        bank = str(data.get('bank_id') or '').strip().upper()
+        acc = re.sub(r'\s', '', str(data.get('account') or ''))
+        holder = ' '.join(str(data.get('holder') or '').split()).upper()[:60]
+        if bank or acc or holder:
+            if not re.fullmatch(r'[A-Z0-9]{2,12}', bank):
+                raise OrderError("Hãy chọn ngân hàng.")
+            if not re.fullmatch(r'\d{6,20}', acc):
+                raise OrderError("Số tài khoản chỉ gồm 6–20 chữ số.")
+            if not holder:
+                raise OrderError("Hãy nhập tên chủ tài khoản.")
+        with transaction() as cur:
+            for k, v in (('cfg_bank_id', bank), ('cfg_bank_account', acc), ('cfg_bank_holder', holder)):
+                cur.execute("""INSERT INTO app_settings (key, value) VALUES (%s, %s)
+                               ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()""", (k, v))
+        audit('Đổi tài khoản nhận chuyển khoản', bank or '(xoá)', f"STK ***{acc[-4:]}" if acc else '')
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True})
+
+
+# =========================================================
 # 9. KIỂM TRA KẾT NỐI DATABASE
 # =========================================================
 
@@ -2238,7 +2960,7 @@ from flask import send_from_directory
 
 @app.route('/favicon.ico')
 def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static'),
+    return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
                                'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 if __name__ == '__main__':

@@ -221,6 +221,9 @@
 </div>
 
 <!-- Thông báo nhỏ -->
+<!-- ================= YÊU CẦU TỪ BÀN (khách bấm gọi) ================= -->
+<div id="callPanel" class="hidden fixed top-4 right-4 z-[65] w-80 max-h-[70vh] overflow-y-auto space-y-2"></div>
+
 <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl"></div>
 
 
@@ -797,7 +800,7 @@
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
               <div class="text-sm font-bold ${status === 'CANCELLED' ? 'line-through text-slate-500' : 'text-white'}">
-                ${esc(i.name)} <span class="text-amber-400">×${i.qty}</span>
+                ${esc(i.name)} <span class="text-amber-400">×${i.qty}</span>${i.source === 'QR' ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-sky-900 text-sky-300 text-[9px] font-black align-middle">KHÁCH QR</span>' : ''}
               </div>
               <div class="text-[11px] text-slate-500">
                 ${esc(i.time)}${i.unit_price ? ' · ' + money(i.unit_price * i.qty) : ''}${isCombo ? ' · combo' : ''}
@@ -912,6 +915,44 @@
       refreshTables();
     }
   }, 5000);
+
+
+  // ============ YÊU CẦU TỪ BÀN ============
+  let KNOWN_CALLS = new Set(), CALL_FIRST = true;
+  function beep() {
+    try {
+      const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain();
+      o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.value = 0.15;
+      o.start(); setTimeout(() => { o.stop(); a.close(); }, 350);
+    } catch (e) {}
+  }
+  async function pollCalls() {
+    const r = await api('/api/service-calls?staff=' + encodeURIComponent(STAFF_ID));
+    const calls = r.calls || [];
+    let fresh = false;
+    calls.forEach(c => { if (!KNOWN_CALLS.has(c.id)) { fresh = true; KNOWN_CALLS.add(c.id); } });
+    if (fresh && !CALL_FIRST) beep();
+    CALL_FIRST = false;
+    const box = document.getElementById('callPanel');
+    box.classList.toggle('hidden', !calls.length);
+    box.innerHTML = calls.map(c => {
+      const bill = c.kind === 'BILL', mins = Math.floor(c.waiting / 60);
+      return `<div class="rounded-2xl p-3 shadow-xl border-2 ${bill ? 'bg-emerald-950 border-emerald-500' : 'bg-amber-950 border-amber-500'} ${c.mine ? 'ring-2 ring-white' : ''}">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="font-black text-sm"><i class="fa-solid ${bill ? 'fa-receipt' : 'fa-bell'} mr-1"></i>Bàn ${esc(c.table_id)} · ${bill ? 'Xin tính tiền' : 'Gọi nhân viên'}</div>
+            <div class="text-[11px] text-slate-300">${esc(c.at)} · chờ ${mins} phút${c.staff_name ? ' · ' + (c.mine ? 'bàn của bạn' : esc(c.staff_name)) : ''}</div>
+          </div>
+          <button onclick="doneCall(${c.id})" class="shrink-0 px-3 py-1.5 rounded-lg bg-white text-slate-900 text-xs font-black">Đã xử lý</button>
+        </div></div>`;
+    }).join('');
+  }
+  async function doneCall(id) {
+    const r = await api('/api/service-calls/' + id + '/done', { staff_id: STAFF_ID });
+    if (!r.success) toast(r.message, false);
+    pollCalls();
+  }
+  pollCalls(); setInterval(pollCalls, 4000);
 
 
   // ============ KHỞI TẠO ============

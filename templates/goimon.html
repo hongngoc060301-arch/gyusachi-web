@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gọi món tại bàn {{ table.id }} - Gyu Sachi</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: #050505; }
+    .chip.active { background: #dc2626; border-color: #dc2626; color: #fff; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-32">
+
+<!-- ================= TIÊU ĐỀ ================= -->
+<header class="sticky top-0 z-30 bg-slate-900/95 backdrop-blur border-b border-slate-800">
+  <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div class="flex-1 min-w-0">
+      <p class="text-red-500 font-black tracking-[.3em] text-[10px]">GYU SACHI</p>
+      <h1 class="text-lg font-black leading-tight">Bàn <span class="text-red-500">{{ table.name or table.id }}</span></h1>
+    </div>
+    <div id="orderChips" class="flex flex-wrap justify-end gap-1.5"></div>
+  </div>
+</header>
+
+<main class="max-w-3xl mx-auto px-4 pt-4">
+
+  <!-- bàn chưa mở -->
+  <section id="closedView" class="hidden text-center py-16">
+    <i class="fa-solid fa-bell-concierge text-5xl text-slate-600"></i>
+    <h2 class="mt-5 text-xl font-black">Bàn chưa được mở</h2>
+    <p class="text-sm text-slate-400 mt-2">Vui lòng chờ nhân viên đón và mở bàn cho bạn, hoặc bấm nút bên dưới để gọi nhân viên.</p>
+  </section>
+
+  <!-- thực đơn -->
+  <section id="menuView" class="hidden">
+    <div id="menuTabs" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
+    <div class="relative mt-3">
+      <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+      <input id="searchBox" oninput="onSearch(this.value)" placeholder="Tìm món..."
+        class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-red-500 outline-none text-sm">
+    </div>
+    <div id="catChips" class="flex gap-2 overflow-x-auto no-scrollbar mt-3"></div>
+    <p class="text-[11px] text-slate-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i>Món ngoài thực đơn này (gọi lẻ, combo...) vui lòng bấm <b>Gọi nhân viên</b>. Nước lẻ có giá riêng, tính thêm vào hoá đơn.</p>
+    <div id="menuGrid" class="grid grid-cols-2 gap-3 mt-4"></div>
+
+    <h3 class="mt-8 text-xs font-bold text-slate-400 uppercase tracking-widest">Món đã gọi</h3>
+    <div id="sentList" class="mt-3 space-y-2"></div>
+  </section>
+</main>
+
+<!-- ================= THANH DƯỚI CÙNG ================= -->
+<div class="fixed bottom-0 inset-x-0 z-40 bg-slate-900 border-t border-slate-800">
+  <div class="max-w-3xl mx-auto p-3 space-y-2">
+    <button id="cartBar" onclick="openCart()" class="hidden w-full flex items-center justify-between px-5 py-3 rounded-2xl bg-red-600 hover:bg-red-500 font-black transition">
+      <span><i class="fa-solid fa-basket-shopping mr-2"></i><span id="cartCount">0</span> phần đã chọn</span>
+      <span>XEM &amp; GỬI BẾP <i class="fa-solid fa-chevron-up ml-1"></i></span>
+    </button>
+    <div class="grid grid-cols-2 gap-2">
+      <button id="callBtn" onclick="callStaff('CALL')" class="py-3 rounded-2xl border-2 border-slate-700 bg-slate-950 hover:border-amber-500 font-bold text-sm transition">
+        <i class="fa-solid fa-bell mr-2 text-amber-400"></i><span id="callLbl">Gọi nhân viên</span></button>
+      <button id="billBtn" onclick="callStaff('BILL')" class="py-3 rounded-2xl border-2 border-slate-700 bg-slate-950 hover:border-emerald-500 font-bold text-sm transition">
+        <i class="fa-solid fa-receipt mr-2 text-emerald-400"></i><span id="billLbl">Xin tính tiền</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= GIỎ HÀNG ================= -->
+<div id="cartModal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center" onclick="if(event.target===this) closeCart()">
+  <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 max-h-[85vh] flex flex-col">
+    <div class="flex items-center justify-between">
+      <h4 class="text-lg font-black">Món bạn đã chọn</h4>
+      <button onclick="closeCart()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-red-600 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="cartList" class="mt-4 space-y-2 overflow-y-auto flex-1"></div>
+    <div id="cartTotal" class="flex justify-between text-sm text-slate-300 mt-3"></div>
+    <button id="sendBtn" onclick="sendToKitchen()" class="mt-3 w-full py-3.5 rounded-2xl bg-red-600 hover:bg-red-500 disabled:opacity-40 font-black transition">
+      <i class="fa-solid fa-paper-plane mr-2"></i>GỬI XUỐNG BẾP</button>
+  </div>
+</div>
+
+<!-- ================= CHỌN MÓN TRONG COMBO ================= -->
+<div id="choiceModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4">
+  <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6">
+    <h4 id="choiceTitle" class="text-lg font-black"></h4>
+    <div id="choiceBody" class="mt-4 space-y-4"></div>
+    <div class="flex gap-3 mt-5">
+      <button onclick="closeChoice()" class="flex-1 py-3 rounded-xl bg-slate-800 font-bold text-sm">HUỶ</button>
+      <button onclick="confirmChoice()" class="flex-1 py-3 rounded-xl bg-red-600 font-bold text-sm">THÊM</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="hidden fixed bottom-28 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl max-w-[90vw] text-center"></div>
+
+
+<script>
+  const TABLE_ID = "{{ table.id }}";
+  let ORDER = null, CART = [], MENU = {}, ITEM_INDEX = {};
+  let tab = 'food', cat = 'ALL', search = '', pendingChoice = null, OPEN_CALLS = [];
+
+  const STATUS_TEXT = { NEW: 'Chờ bếp', DOING: 'Đang làm', DONE: 'Đã xong', CANCELLED: 'Đã huỷ' };
+  const STATUS_CLASS = {
+    NEW: 'bg-red-950/60 text-red-300 border-red-800/50', DOING: 'bg-amber-950/60 text-amber-300 border-amber-700/50',
+    DONE: 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50', CANCELLED: 'bg-slate-800 text-slate-500 border-slate-700 line-through'
+  };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function money(n) { return Number(n).toLocaleString('vi-VN') + 'đ'; }
+  async function api(url, body) {
+    try {
+      const res = await fetch(url, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      return await res.json();
+    } catch (e) { return { success: false, message: 'Mất kết nối, vui lòng thử lại.' }; }
+  }
+  let toastTimer = null;
+  function toast(msg, ok) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'fixed bottom-28 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl text-sm font-bold shadow-xl max-w-[90vw] text-center ' + (ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add('hidden'), 2800);
+  }
+
+
+  // ============ TẢI ĐƠN CỦA BÀN ============
+  async function loadOrder(first) {
+    const [r, c] = await Promise.all([api('/api/orders/by-table/' + encodeURIComponent(TABLE_ID)),
+                                      api('/api/service-call/status?table_id=' + encodeURIComponent(TABLE_ID))]);
+    OPEN_CALLS = c.open || [];
+    renderCalls();
+    const was = ORDER;
+    ORDER = r.order || null;
+    if (!ORDER) {
+      CART = [];
+      document.getElementById('closedView').classList.remove('hidden');
+      document.getElementById('menuView').classList.add('hidden');
+      document.getElementById('orderChips').innerHTML = '';
+      document.getElementById('cartBar').classList.add('hidden');
+      document.getElementById('billBtn').classList.add('hidden');
+      return;
+    }
+    document.getElementById('billBtn').classList.remove('hidden');
+    document.getElementById('closedView').classList.add('hidden');
+    document.getElementById('menuView').classList.remove('hidden');
+    if (!was || was.id !== ORDER.id || first) {
+      tab = ORDER.package_id ? 'food' : (ORDER.drink_package_id ? 'drink' : 'alacarte'); cat = 'ALL';
+      renderChips(); renderTabs(); loadAndRenderMenu();
+    }
+    renderSent();
+  }
+
+  function renderChips() {
+    const c = [`<span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-[11px] font-bold"><i class="fa-solid fa-users mr-1 text-amber-400"></i>${ORDER.guests} khách</span>`];
+    c.push(ORDER.package_name ? `<span class="px-2.5 py-0.5 rounded-full bg-red-950/70 border border-red-800/50 text-red-300 text-[11px] font-bold">${esc(ORDER.package_name)}</span>`
+                              : `<span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[11px] font-bold">Gọi lẻ</span>`);
+    if (ORDER.drink_name) c.push(`<span class="px-2.5 py-0.5 rounded-full bg-sky-950/70 border border-sky-800/50 text-sky-300 text-[11px] font-bold">${esc(ORDER.drink_name)}</span>`);
+    document.getElementById('orderChips').innerHTML = c.join('');
+  }
+
+  function renderCalls() {
+    const call = OPEN_CALLS.includes('CALL'), bill = OPEN_CALLS.includes('BILL');
+    document.getElementById('callLbl').textContent = call ? 'Đã gọi, nhân viên sắp tới' : 'Gọi nhân viên';
+    document.getElementById('billLbl').textContent = bill ? 'Đã xin tính tiền' : 'Xin tính tiền';
+    document.getElementById('callBtn').classList.toggle('border-amber-500', call);
+    document.getElementById('billBtn').classList.toggle('border-emerald-500', bill);
+  }
+
+  async function callStaff(kind) {
+    if (OPEN_CALLS.includes(kind)) { toast('Nhân viên đã nhận được yêu cầu, bạn vui lòng chờ một chút.', true); return; }
+    if (kind === 'BILL' && !confirm('Gọi nhân viên mang hoá đơn tới tính tiền?')) return;
+    const r = await api('/api/service-call', { table_id: TABLE_ID, kind });
+    if (!r.success) { toast(r.message || 'Chưa gửi được yêu cầu', false); return; }
+    toast(kind === 'CALL' ? 'Đã gọi nhân viên, vui lòng chờ một chút' : 'Đã gửi yêu cầu tính tiền', true);
+    loadOrder();
+  }
+
+
+  // ============ THỰC ĐƠN ============
+  function renderTabs() {
+    const t = [];
+    if (ORDER.package_id)       t.push(['food',  'fa-utensils', 'Buffet đồ ăn']);
+    if (ORDER.drink_package_id) t.push(['drink', 'fa-martini-glass-citrus', 'Buffet nước']);
+    else t.push(['alacarte', 'fa-martini-glass-citrus', 'Nước lẻ']);
+    document.getElementById('menuTabs').innerHTML = t.map(x => `
+      <button data-t="${x[0]}" onclick="setTab(this.dataset.t)"
+        class="chip ${tab === x[0] ? 'active' : ''} shrink-0 px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 text-sm font-bold hover:border-red-500 transition">
+        <i class="fa-solid ${x[1]} mr-2"></i>${x[2]}</button>`).join('');
+  }
+  function setTab(t) { tab = t; cat = 'ALL'; renderTabs(); loadAndRenderMenu(); }
+  function onSearch(v) { search = v.trim().toLowerCase(); renderMenu(); }
+  function setCat(c) { cat = c; renderMenu(); }
+
+  function menuKey() {
+    if (tab === 'food')  return ['pkg-' + ORDER.package_id, '/api/menu/package/' + ORDER.package_id];
+    if (tab === 'drink') return ['pkg-' + ORDER.drink_package_id, '/api/menu/package/' + ORDER.drink_package_id];
+    return ['alacarte', '/api/menu/alacarte?drinks=1'];
+  }
+  async function loadAndRenderMenu() {
+    const [key, url] = menuKey();
+    document.getElementById('menuGrid').innerHTML = '<p class="col-span-full text-center text-slate-500 text-sm mt-10">Đang tải thực đơn...</p>';
+    if (!MENU[key]) { const r = await api(url); MENU[key] = r.categories || []; }
+    renderMenu();
+  }
+  function cartQtyOf(type, id) { return CART.filter(c => c.type === type && c.id === id).reduce((s, c) => s + c.qty, 0); }
+
+  function renderMenu() {
+    const [key] = menuKey();
+    const cats = MENU[key] || [];
+    const type = tab === 'alacarte' ? 'ALACARTE' : 'PACKAGE';
+    document.getElementById('catChips').innerHTML = [['ALL', 'Tất cả']].concat(cats.map(g => [g.name, g.name])).map(c => `
+      <button data-cat="${esc(c[0])}" onclick="setCat(this.dataset.cat)"
+        class="chip ${cat === c[0] ? 'active' : ''} shrink-0 px-3.5 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-bold hover:border-red-500 transition">${esc(c[1])}</button>`).join('');
+
+    const html = [];
+    cats.forEach(g => {
+      if (cat !== 'ALL' && cat !== g.name) return;
+      const items = g.items.filter(i => !search || i.name.toLowerCase().includes(search));
+      if (!items.length) return;
+      html.push(`<h5 class="col-span-full text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">${esc(g.name)}</h5>`);
+      items.forEach(i => {
+        ITEM_INDEX[type + ':' + i.id] = Object.assign({ type }, i);
+        const q = cartQtyOf(type, i.id);
+        html.push(`
+          <button onclick="addToCart('${type}', ${i.id})"
+            class="relative text-left rounded-2xl border ${q ? 'border-red-500 bg-red-950/30' : 'border-slate-800 bg-slate-900 hover:border-slate-600'} p-3.5 transition active:scale-95">
+            ${q ? `<span class="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-600 text-xs font-black flex items-center justify-center">${q}</span>` : ''}
+            ${i.is_combo ? '<span class="text-[10px] font-black text-amber-400 tracking-widest">COMBO / SET</span>' : ''}
+            <div class="font-bold text-sm text-white leading-snug">${esc(i.name)}</div>
+            ${i.price !== undefined ? `<div class="mt-1.5 text-sm font-black text-amber-400">${money(i.price)}</div>` : ''}
+          </button>`);
+      });
+    });
+    document.getElementById('menuGrid').innerHTML = html.length ? html.join('') :
+      '<p class="col-span-full text-center text-slate-500 text-sm mt-10">Không tìm thấy món nào.</p>';
+  }
+
+
+  // ============ GIỎ HÀNG ============
+  function cartKey(type, id, choices) { return type + ':' + id + ':' + JSON.stringify(choices || {}); }
+  function addToCart(type, id) {
+    const item = ITEM_INDEX[type + ':' + id]; if (!item) return;
+    if (item.is_combo && item.parts.some(p => p.choices)) { pendingChoice = { item, picked: {} }; openChoice(); return; }
+    pushCart(item, {});
+  }
+  function pushCart(item, choices) {
+    const key = cartKey(item.type, item.id, choices);
+    const line = CART.find(c => c.key === key);
+    if (line) line.qty = Math.min(99, line.qty + 1);
+    else CART.push({ key, type: item.type, id: item.id, name: item.name, price: item.price, qty: 1, choices,
+      choiceText: item.is_combo ? item.parts.filter(p => p.choices).map(p => choices[p.id]).join(', ') : '' });
+    renderCart(); renderMenu();
+  }
+  function changeQty(key, d) {
+    const line = CART.find(c => c.key === key); if (!line) return;
+    line.qty = Math.min(99, line.qty + d);
+    if (line.qty <= 0) CART = CART.filter(c => c.key !== key);
+    renderCart(); renderMenu();
+  }
+  function renderCart() {
+    const count = CART.reduce((s, c) => s + c.qty, 0);
+    document.getElementById('cartCount').textContent = count;
+    document.getElementById('cartBar').classList.toggle('hidden', !count);
+    document.getElementById('cartList').innerHTML = CART.length ? CART.map(c => `
+      <div class="rounded-xl bg-slate-950 border border-slate-800 p-3 flex justify-between gap-2">
+        <div class="min-w-0"><div class="font-bold text-sm">${esc(c.name)}</div>
+          ${c.choiceText ? `<div class="text-[11px] text-amber-300">${esc(c.choiceText)}</div>` : ''}
+          ${c.price !== undefined ? `<div class="text-[11px] text-slate-400">${money(c.price)}</div>` : ''}</div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button data-key="${esc(c.key)}" onclick="changeQty(this.dataset.key, -1)" class="w-8 h-8 rounded-lg bg-slate-800 font-black">−</button>
+          <span class="w-6 text-center font-black">${c.qty}</span>
+          <button data-key="${esc(c.key)}" onclick="changeQty(this.dataset.key, 1)" class="w-8 h-8 rounded-lg bg-slate-800 font-black">+</button>
+        </div></div>`).join('') : '<p class="text-sm text-slate-500">Chưa chọn món nào.</p>';
+    const total = CART.filter(c => c.price !== undefined).reduce((s, c) => s + c.price * c.qty, 0);
+    document.getElementById('cartTotal').innerHTML = `<span>${count} phần</span><span>${total ? 'Gọi lẻ: <b class="text-amber-400">' + money(total) + '</b>' : ''}</span>`;
+    document.getElementById('sendBtn').disabled = !CART.length;
+    if (!CART.length) closeCart();
+  }
+  function openCart() { document.getElementById('cartModal').classList.remove('hidden'); }
+  function closeCart() { document.getElementById('cartModal').classList.add('hidden'); }
+
+  function openChoice() {
+    const item = pendingChoice.item;
+    document.getElementById('choiceTitle').textContent = item.name;
+    document.getElementById('choiceBody').innerHTML = item.parts.filter(p => p.choices).map(p => `
+      <div><p class="text-sm font-bold text-slate-300 mb-2">${esc(p.name)}</p>
+        <div class="flex flex-wrap gap-2">${p.choices.map(ch => `
+          <button data-part="${p.id}" data-choice="${esc(ch)}" onclick="pickChoice(${p.id}, this)"
+            class="choice-btn chip px-4 py-2 rounded-xl border border-slate-700 bg-slate-950 text-sm font-bold hover:border-red-500">${esc(ch)}</button>`).join('')}</div></div>`).join('');
+    document.getElementById('choiceModal').classList.remove('hidden');
+  }
+  function pickChoice(partId, btn) {
+    pendingChoice.picked[partId] = btn.dataset.choice;
+    document.querySelectorAll('.choice-btn[data-part="' + partId + '"]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  function closeChoice() { document.getElementById('choiceModal').classList.add('hidden'); pendingChoice = null; }
+  function confirmChoice() {
+    const item = pendingChoice.item;
+    const missing = item.parts.filter(p => p.choices && !pendingChoice.picked[p.id]);
+    if (missing.length) { toast('Hãy chọn: ' + missing[0].name, false); return; }
+    pushCart(item, pendingChoice.picked); closeChoice();
+  }
+
+
+  // ============ GỬI BẾP ============
+  async function sendToKitchen() {
+    if (!CART.length || !ORDER) return;
+    const btn = document.getElementById('sendBtn'); btn.disabled = true;
+    const r = await api('/api/orders/' + ORDER.id + '/items', {
+      source: 'QR', items: CART.map(c => ({ type: c.type, id: c.id, qty: c.qty, choices: c.choices })) });
+    if (!r.success) { toast(r.message, false); btn.disabled = false; return; }
+    CART = []; ORDER = r.order;
+    closeCart(); renderCart(); renderMenu(); renderSent();
+    toast('Đã gửi món xuống bếp. Bạn chờ một chút nhé!', true);
+  }
+
+
+  // ============ MÓN ĐÃ GỌI ============
+  function comboStatus(ch) {
+    const live = ch.filter(c => c.status !== 'CANCELLED');
+    if (!live.length) return 'CANCELLED';
+    if (live.every(c => c.status === 'DONE')) return 'DONE';
+    if (live.every(c => c.status === 'NEW')) return 'NEW';
+    return 'DOING';
+  }
+  function renderSent() {
+    const box = document.getElementById('sentList');
+    const top = ORDER.items.filter(i => i.parent_id === null).slice().reverse();
+    if (!top.length) { box.innerHTML = '<p class="text-xs text-slate-600">Chưa gọi món nào.</p>'; return; }
+    box.innerHTML = top.map(i => {
+      const ch = ORDER.items.filter(c => c.parent_id === i.id), isCombo = i.kind === 'COMBO';
+      const st = isCombo ? comboStatus(ch) : i.status;
+      return `<div class="rounded-xl bg-slate-900 border border-slate-800 p-3 ${st === 'CANCELLED' ? 'opacity-50' : ''}">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0"><div class="text-sm font-bold ${st === 'CANCELLED' ? 'line-through text-slate-500' : ''}">${esc(i.name)} <span class="text-amber-400">×${i.qty}</span></div>
+            <div class="text-[11px] text-slate-500">${esc(i.time)}${i.unit_price ? ' · ' + money(i.unit_price * i.qty) : ''}</div></div>
+          <span class="shrink-0 px-2 py-0.5 rounded-full border text-[10px] font-bold ${STATUS_CLASS[st]}">${STATUS_TEXT[st]}</span>
+        </div>
+        ${st === 'NEW' && i.source === 'QR' ? `<button onclick="cancelItem(${i.id})" class="mt-2 text-[11px] text-slate-500 hover:text-red-400 underline">Huỷ món</button>` : ''}
+      </div>`;
+    }).join('');
+  }
+  async function cancelItem(id) {
+    if (!confirm('Huỷ món này?')) return;
+    const r = await api('/api/order-items/' + id + '/cancel', {});
+    if (!r.success) { toast(r.message, false); return; }
+    ORDER = r.order; renderSent(); toast('Đã huỷ món', true);
+  }
+
+
+  loadOrder(true);
+  setInterval(loadOrder, 5000);
+</script>
+</body>
+</html>
