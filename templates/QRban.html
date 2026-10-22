@@ -3,51 +3,137 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>In mã QR bàn - Gyu Sachi</title>
+  <title>In mã QR bàn - Gyu Sachi (bản độc lập)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
+    * { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; margin: 0; background: #f1f5f9; color: #0f172a; }
-    .bar { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #cbd5e1; padding: 12px 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-    .bar input { flex: 1; min-width: 260px; padding: 8px 10px; border: 1px solid #94a3b8; border-radius: 8px; }
-    .bar button { padding: 9px 18px; border: 0; border-radius: 8px; background: #dc2626; color: #fff; font-weight: bold; cursor: pointer; }
-    .hint { font-size: 12px; color: #64748b; padding: 8px 20px; }
+    .panel { background: #fff; border-bottom: 1px solid #cbd5e1; padding: 14px 20px; display: grid; gap: 10px; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    label { font-weight: bold; font-size: 14px; }
+    input[type=text] { flex: 1; min-width: 260px; padding: 9px 10px; border: 1px solid #94a3b8; border-radius: 8px; font-size: 15px; }
+    textarea { width: 100%; height: 110px; padding: 9px 10px; border: 1px solid #94a3b8; border-radius: 8px; font-family: monospace; font-size: 14px; }
+    button { padding: 10px 18px; border: 0; border-radius: 8px; background: #dc2626; color: #fff; font-weight: bold; cursor: pointer; font-size: 15px; }
+    button.alt { background: #334155; }
+    .hint { font-size: 13px; color: #64748b; line-height: 1.5; }
+    .warn { font-size: 13px; color: #b45309; background: #fef3c7; border-radius: 8px; padding: 8px 12px; display: none; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; padding: 16px 20px; }
     .card { background: #fff; border: 2px dashed #94a3b8; border-radius: 14px; padding: 16px; text-align: center; break-inside: avoid; }
-    .card h2 { margin: 0 0 2px; font-size: 22px; } .card small { color: #dc2626; font-weight: bold; letter-spacing: 3px; }
+    .card small { color: #dc2626; font-weight: bold; letter-spacing: 3px; }
+    .card h2 { margin: 2px 0 0; font-size: 22px; }
     .qr { display: flex; justify-content: center; margin: 12px 0 8px; }
-    .card p { margin: 0; font-size: 12px; color: #475569; }
-    @media print { .bar, .hint { display: none; } body { background: #fff; } .grid { padding: 0; gap: 8px; } }
+    .card p { margin: 0; font-size: 13px; color: #475569; }
+    .card .url { margin-top: 6px; font-size: 9px; color: #94a3b8; word-break: break-all; }
+    @media print {
+      .panel { display: none; }
+      body { background: #fff; }
+      .grid { padding: 0; gap: 8px; grid-template-columns: repeat(3, 1fr); }
+      .card .url { display: none; }
+    }
   </style>
 </head>
 <body>
-<div class="bar">
-  <b>Địa chỉ web của nhà hàng:</b>
-  <input id="base" oninput="draw()" placeholder="http://192.168.1.10:5000">
-  <button onclick="window.print()">In tất cả</button>
+
+<div class="panel">
+  <div class="row">
+    <label for="base">Địa chỉ web của nhà hàng:</label>
+    <input type="text" id="base" placeholder="https://order.tenquan.vn  hoặc  http://192.168.1.10:5000">
+  </div>
+  <div>
+    <label for="tables">Danh sách bàn (mỗi dòng: mã|chữ hiển thị trên thẻ)</label>
+    <textarea id="tables" spellcheck="false">A1|Bàn A1
+A2|Bàn A2
+A3|Bàn A3
+A4|Bàn A4
+A5|Bàn A5
+A6|Bàn A6
+A7|Bàn A7
+B1|Bàn B1
+B2|Bàn B2
+B3|Bàn B3
+B4|Bàn B4
+B5|Bàn B5
+B6|Bàn B6
+B7|Bàn B7
+B8|Bàn B8
+B9|Bàn B9
+V1|Bàn V1
+V2|Bàn V2</textarea>
+  </div>
+  <div class="row">
+    <button onclick="draw()">Vẽ mã QR</button>
+    <button class="alt" onclick="window.print()">In tất cả</button>
+  </div>
+  <div class="warn" id="warn"></div>
+  <div class="hint">
+    Link trong mỗi QR có dạng <b>địa-chỉ-web/ban/mã</b>. Mã bàn (bên trái dấu |) là phần nằm trong link,
+    nên đặt đúng với mã mà web của bạn nhận. Nếu web dùng mã ngẫu nhiên cho mỗi bàn thì dán mã đó vào bên trái dấu |.<br>
+    Điện thoại khách phải mở được địa chỉ web này. Không dùng localhost. Dùng IP mạng nội bộ thì chỉ khách bắt wifi quán mới quét được.
+    Quét thử 1 mã bằng điện thoại trước khi in cả loạt.
+  </div>
 </div>
-<div class="hint">Điện thoại khách phải truy cập được địa chỉ này. Dùng IP mạng LAN của máy chủ (vd http://192.168.1.10:5000) hoặc tên miền thật, không dùng localhost.</div>
+
 <div id="grid" class="grid"></div>
+
 <script>
-  let TABLES = [];
-  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function parseTables() {
+    return document.getElementById('tables').value.split('\n')
+      .map(function (l) { return l.trim(); })
+      .filter(Boolean)
+      .map(function (l) {
+        var i = l.indexOf('|');
+        var id = (i >= 0 ? l.slice(0, i) : l).trim();
+        var name = (i >= 0 ? l.slice(i + 1) : 'Bàn ' + l).trim();
+        return { id: id, name: name || ('Bàn ' + id) };
+      })
+      .filter(function (t) { return t.id; });
+  }
+
   function draw() {
-    const base = document.getElementById('base').value.trim().replace(/\/+$/, '');
-    try { localStorage.setItem('qr_base', base); } catch (e) {}
-    const g = document.getElementById('grid'); g.innerHTML = '';
-    TABLES.forEach(t => {
-      const d = document.createElement('div'); d.className = 'card';
-      d.innerHTML = `<small>GYU SACHI</small><h2>Bàn ${esc(t.name || t.id)}</h2><div class="qr"></div><p>Quét mã để gọi món</p>`;
-      g.appendChild(d);
-      try { new QRCode(d.querySelector('.qr'), { text: base + '/ban/' + encodeURIComponent(t.id), width: 160, height: 160 }); }
-      catch (e) { d.querySelector('.qr').textContent = base + '/ban/' + t.id; }
+    var base = document.getElementById('base').value.trim().replace(/\/+$/, '');
+    var warn = document.getElementById('warn');
+    var grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    warn.style.display = 'none';
+
+    try { localStorage.setItem('qr_base', base); localStorage.setItem('qr_tables', document.getElementById('tables').value); } catch (e) {}
+
+    if (!/^https?:\/\//i.test(base)) {
+      warn.textContent = 'Hãy nhập địa chỉ web bắt đầu bằng http:// hoặc https://';
+      warn.style.display = 'block';
+      return;
+    }
+    if (/localhost|127\.0\.0\.1/i.test(base)) {
+      warn.textContent = 'Địa chỉ localhost chỉ chạy trên máy của bạn, điện thoại khách sẽ không mở được. Hãy dùng IP mạng nội bộ hoặc tên miền thật.';
+      warn.style.display = 'block';
+    }
+
+    parseTables().forEach(function (t) {
+      var url = base + '/ban/' + encodeURIComponent(t.id);
+      var d = document.createElement('div');
+      d.className = 'card';
+      d.innerHTML = '<small>GYU SACHI</small><h2>' + esc(t.name) + '</h2><div class="qr"></div><p>Quét mã để gọi món</p><div class="url">' + esc(url) + '</div>';
+      grid.appendChild(d);
+      try {
+        new QRCode(d.querySelector('.qr'), { text: url, width: 160, height: 160 });
+      } catch (e) {
+        d.querySelector('.qr').textContent = url;
+      }
     });
   }
-  (async function () {
-    let saved = ''; try { saved = localStorage.getItem('qr_base') || ''; } catch (e) {}
-    document.getElementById('base').value = saved || location.origin;
-    const r = await (await fetch('/api/manager/tables')).json();
-    TABLES = (r.tables || r || []).filter(t => t.is_active !== false && t.active !== false);
-    draw();
+
+  (function init() {
+    try {
+      var b = localStorage.getItem('qr_base');
+      var t = localStorage.getItem('qr_tables');
+      if (b) document.getElementById('base').value = b;
+      if (t) document.getElementById('tables').value = t;
+    } catch (e) {}
+    if (document.getElementById('base').value) draw();
   })();
 </script>
 </body>
