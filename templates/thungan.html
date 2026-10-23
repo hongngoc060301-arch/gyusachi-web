@@ -24,6 +24,7 @@
       #receipt { display: block; position: absolute; left: 0; top: 0; width: 80mm; padding: 4mm 4mm 6mm;
                  color: #000; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.35; }
       #receipt .c { text-align: center; }
+      #receipt .logo { display: block; margin: 0 auto 3px; max-width: 30mm; max-height: 22mm; filter: grayscale(1) contrast(1.4); }
       #receipt .shop { font-size: 17px; font-weight: 800; letter-spacing: .5px; }
       #receipt .title { font-size: 16px; font-weight: 800; text-align: center; margin: 8px 0 6px; letter-spacing: .5px; }
       #receipt .info { display: grid; grid-template-columns: auto 1fr auto 1fr; column-gap: 6px; row-gap: 1px; }
@@ -567,7 +568,7 @@
     }
 
     document.getElementById('receipt').innerHTML = `
-      <div class="c"><div class="shop">${esc(SHOP.name)}</div>${esc(SHOP.addr)}<br>Tel: ${esc(SHOP.tel)}</div>
+      <div class="c"><img id="rcLogo" class="logo" src="{{ url_for('static', filename='images/logo.png') }}" alt="" onerror="this.remove()"><div class="shop">${esc(SHOP.name)}</div>${esc(SHOP.addr)}<br>Tel: ${esc(SHOP.tel)}</div>
       <div class="title">${paid ? 'HOÁ ĐƠN THANH TOÁN' : 'PHIẾU TẠM TÍNH'}</div>
       <div class="info">
         <b>Bàn:</b><span class="full"><b>${esc(floorTxt)}</b></span>
@@ -591,9 +592,8 @@
       ${qr}`;
 
     // chờ ảnh QR tải xong (tối đa 2,5 giây) rồi mới in
-    const img = document.getElementById('rcQr');
-    if (img && !img.complete) {
-      await new Promise(res => { img.onload = img.onerror = res; setTimeout(res, 2500); });
+    for (const img of document.querySelectorAll('#receipt img')) {
+      if (!img.complete) await new Promise(res => { img.onload = img.onerror = res; setTimeout(res, 2500); });
     }
     window.print();
   }
