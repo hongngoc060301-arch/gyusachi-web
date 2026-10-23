@@ -15,14 +15,30 @@
     .seg.active { background: #f59e0b; color: #0f172a; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
 
-    /* In hoá đơn: chỉ in phần #receipt */
+    /* In hoá đơn: chỉ in phần #receipt (khổ giấy 80mm, mẫu phiếu tạm tính) */
     #receipt { display: none; }
+    @page { size: 80mm auto; margin: 0; }
     @media print {
       body * { visibility: hidden; }
       #receipt, #receipt * { visibility: visible; }
-      #receipt { display: block; position: absolute; left: 0; top: 0; width: 80mm; padding: 4mm;
-                 color: #000; background: #fff; font-family: monospace; font-size: 12px; }
+      #receipt { display: block; position: absolute; left: 0; top: 0; width: 80mm; padding: 4mm 4mm 6mm;
+                 color: #000; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.35; }
+      #receipt .c { text-align: center; }
+      #receipt .shop { font-size: 17px; font-weight: 800; letter-spacing: .5px; }
+      #receipt .title { font-size: 16px; font-weight: 800; text-align: center; margin: 8px 0 6px; letter-spacing: .5px; }
+      #receipt .info { display: grid; grid-template-columns: auto 1fr auto 1fr; column-gap: 6px; row-gap: 1px; }
+      #receipt .info b { font-weight: 700; }
+      #receipt .info .full { grid-column: 2 / 5; }
+      #receipt table { font-size: inherit; width: 100%; border-collapse: collapse; margin-top: 6px; }
+      #receipt th { font-weight: 800; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 0; }
+      #receipt td { padding: 2px 0; vertical-align: top; }
+      #receipt th.n, #receipt td.n { text-align: right; padding-left: 3px; white-space: nowrap; }
+      #receipt th.l, #receipt td.l { text-align: left; }
+      #receipt .sum { margin-top: 4px; border-top: 1px solid #000; padding-top: 3px; }
       #receipt .r { display: flex; justify-content: space-between; gap: 8px; }
+      #receipt .total { font-size: 14px; font-weight: 800; margin-top: 3px; }
+      #receipt .note { font-weight: 700; margin-top: 8px; }
+      #receipt .qr { display: block; margin: 6px auto 2px; width: 34mm; height: auto; }
       #receipt hr { border: 0; border-top: 1px dashed #000; margin: 6px 0; }
     }
   </style>
@@ -46,7 +62,7 @@
       class="mt-5 w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black transition">
       VÀO QUẦY THU NGÂN
     </button>
-    <a href="/#staff-choice" class="block mt-4 text-xs text-slate-500 hover:text-white">← Quay lại</a>
+    <a href="/#staff-login" class="block mt-4 text-xs text-slate-500 hover:text-white">← Quay lại</a>
   </div>
 </div>
 
@@ -269,7 +285,7 @@
 
   async function logout() {
     await api('/api/cashier/logout', {});
-    location.href = '/#staff-choice';
+    location.href = '/#staff-login';
   }
 
   function enterApp() {
@@ -517,26 +533,68 @@
 
 
   // ============ IN HOÁ ĐƠN ============
-  function printBill(paid) {
-    if (!BILL) return;
-    const row = (a, b) => `<div class="r"><span>${esc(a)}</span><span>${esc(b)}</span></div>`;
-    const html = [
-      '<div style="text-align:center"><b>GYU SACHI</b><br>NHÀ HÀNG BUFFET NHẬT - HÀN</div><hr>',
-      row('Bàn ' + BILL.table_id, BILL.guests + ' khách'),
-      row('Giờ vào', BILL.opened_at),
-      '<hr>'
-    ];
-    if (BILL.food_name)  html.push(row(BILL.food_name + ' x' + BILL.guests, money(BILL.food_amount)));
-    if (BILL.drink_name) html.push(row(BILL.drink_name + ' x' + BILL.guests, money(BILL.drink_amount)));
-    BILL.lines.forEach(l => html.push(row(l.name + ' x' + l.qty, money(l.amount))));
-    html.push('<hr>', row('Tạm tính', money(BILL.subtotal)));
-    if (BILL.discount) html.push(row('Giảm giá (ưu đãi nhóm)', '-' + money(BILL.discount)));
-    html.push(row('VAT ' + +(BILL.vat_rate * 100).toFixed(1) + '%', money(BILL.vat)),
-              '<hr>', '<b>' + row('TỔNG', money(BILL.total)) + '</b>');
-    if (paid && CUR && CUR.method) html.push('<hr>', row('Thanh toán', METHOD_NAME[CUR.method]));
-    html.push('<hr><div style="text-align:center">' + (paid ? 'Cảm ơn quý khách!' : '(Hoá đơn tạm tính)') + '</div>');
+  // Thông tin cửa hàng in trên đầu phiếu (sửa tại đây)
+  const SHOP = { name: 'Gyu Sachi', addr: '44 Trần Văn Trứ', tel: '0983.194.917' };
 
-    document.getElementById('receipt').innerHTML = html.join('');
+  const vnd = n => Number(n).toLocaleString('vi-VN');          // 1.234.000 (không kèm chữ đ)
+  const two = n => String(n).padStart(2, '0');
+
+  async function printBill(paid) {
+    if (!BILL) return;
+    const now = new Date();
+    const nowTxt = `${two(now.getDate())}/${two(now.getMonth() + 1)}/${now.getFullYear()} ${two(now.getHours())}:${two(now.getMinutes())}`;
+    const vatPct = +(BILL.vat_rate * 100).toFixed(1);
+    const tr = (name, qty, price, vat, amount) =>
+      `<tr><td class="l">${esc(name)}</td><td class="n">${qty}</td><td class="n">${vnd(price)}</td><td class="n">${vnd(vat)}</td><td class="n">${vnd(amount)}</td></tr>`;
+
+    const rows = [];
+    if (BILL.food_name)  rows.push(tr(BILL.food_name, BILL.guests, BILL.food_price, BILL.food_vat, BILL.food_amount));
+    if (BILL.drink_name) rows.push(tr(BILL.drink_name, BILL.guests, BILL.drink_price, BILL.drink_vat, BILL.drink_amount));
+    BILL.lines.forEach(l => rows.push(tr(l.name, l.qty, l.unit_price, l.vat, l.amount)));
+    if (BILL.discount) rows.push(tr('Ưu đãi nhóm (miễn ' + BILL.promo_free + ' suất)', BILL.promo_free, -BILL.food_price, -BILL.discount_vat, -BILL.discount));
+
+    const sr = (a, b, cls) => `<div class="r ${cls || ''}"><span>${a}</span><span>${b}</span></div>`;
+    const floorTxt = (BILL.floor ? 'TẦNG ' + BILL.floor + ' - ' : '') + BILL.table_id;
+    const sub = BILL.subtotal - BILL.discount;
+
+    // Mã QR chuyển khoản (chỉ in trên phiếu tạm tính, khi quản lí đã nhập tài khoản)
+    let qr = '';
+    if (!paid && PAYCFG && PAYCFG.bank_id && PAYCFG.account) {
+      const src = 'https://img.vietqr.io/image/' + encodeURIComponent(PAYCFG.bank_id) + '-' + encodeURIComponent(PAYCFG.account) +
+        '-compact2.png?amount=' + Math.round(BILL.total) + '&addInfo=' + encodeURIComponent('Ban ' + BILL.table_id) +
+        '&accountName=' + encodeURIComponent(PAYCFG.holder || '');
+      qr = `<img id="rcQr" class="qr" src="${src}" alt=""><div class="c" style="font-size:10px">Quét mã để chuyển khoản</div>`;
+    }
+
+    document.getElementById('receipt').innerHTML = `
+      <div class="c"><div class="shop">${esc(SHOP.name)}</div>${esc(SHOP.addr)}<br>Tel: ${esc(SHOP.tel)}</div>
+      <div class="title">${paid ? 'HOÁ ĐƠN THANH TOÁN' : 'PHIẾU TẠM TÍNH'}</div>
+      <div class="info">
+        <b>Bàn:</b><span class="full"><b>${esc(floorTxt)}</b></span>
+        <b>Ngày:</b><span>${esc(BILL.open_date || nowTxt.slice(0, 10))}</span><b>Số HD:</b><span>${String(BILL.order_id).padStart(5, '0')}</span>
+        <b>Giờ vào:</b><span>${esc(BILL.open_time || BILL.opened_at)}</span><b>Giờ ra:</b><span>${esc(nowTxt)}</span>
+        <b>Phục vụ:</b><span>${esc(BILL.staff_name || '')}</span><b>T.Ngân:</b><span>${esc(CASHIER && CASHIER.name ? CASHIER.name.toUpperCase() : 'THU NGÂN')}</span>
+        <b>SL khách:</b><span class="full">${BILL.guests}</span>
+      </div>
+      <table>
+        <thead><tr><th class="l">Tên món</th><th class="n">SL</th><th class="n">Đ.Giá</th><th class="n">VAT</th><th class="n">T.Tiền</th></tr></thead>
+        <tbody>${rows.join('')}</tbody>
+      </table>
+      <div class="sum">
+        ${sr('Cộng tiền hàng', vnd(sub))}
+        ${sr('Tiền VAT ' + vatPct + '%', vnd(BILL.vat))}
+        ${sr('Tổng Tiền Thanh Toán:', vnd(BILL.total), 'total')}
+        ${paid && CUR && CUR.method ? sr('Hình thức', esc(METHOD_NAME[CUR.method])) : ''}
+      </div>
+      <div class="note">Lưu ý: Hóa đơn chỉ được xuất trong ngày!!</div>
+      <div class="c" style="margin-top:4px">Xin cảm ơn và hẹn gặp lại !</div>
+      ${qr}`;
+
+    // chờ ảnh QR tải xong (tối đa 2,5 giây) rồi mới in
+    const img = document.getElementById('rcQr');
+    if (img && !img.complete) {
+      await new Promise(res => { img.onload = img.onerror = res; setTimeout(res, 2500); });
+    }
     window.print();
   }
 

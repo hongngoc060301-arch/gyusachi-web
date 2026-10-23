@@ -418,6 +418,44 @@
     font-size: 18px;
 }
 
+/* =========================
+   ĐIỆN THOẠI: bỏ sơ đồ mặt bằng, hiện bàn dạng lưới 2 cột để dễ bấm
+   ========================= */
+@media (max-width: 900px) {
+    .booking-section { padding: 30px 12px; }
+
+    .floor-map {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .floor-map .walkway,
+    .floor-map .stairs,
+    .floor-map .cashier,
+    .floor-map .kitchen,
+    .floor-map .toilet { display: none !important; }
+
+    .floor-map .table {
+        position: static !important;
+        width: auto !important;
+        height: 68px !important;
+        left: auto !important;
+        right: auto !important;
+        top: auto !important;
+        bottom: auto !important;
+        transform: none !important;
+        font-size: 22px;
+    }
+
+    .floor-booking { margin: 24px auto; }
+    .selected-table { margin: 16px 12px; font-size: 16px; }
+}
+
 </style>
 
     <!-- 3. ĐẶT BÀN -->
@@ -444,6 +482,8 @@
         <input
           id="guestCount"
           type="number"
+          inputmode="numeric"
+          onkeydown="if(['-','+','e','E','.',','].includes(event.key)) event.preventDefault()"
           min="1"
           max="10"
           value="2"
@@ -676,8 +716,9 @@
       const guestInput = document.getElementById('guestCount');
       const guests = parseInt(guestInput.value);
 
-      if (!guests || guests < 1) {
-        alert('Vui lòng nhập số lượng khách!');
+      if (!Number.isInteger(guests) || guests < 1) {
+        alert(guests < 0 ? 'Số lượng khách không được là số âm!' : 'Vui lòng nhập số lượng khách hợp lệ (từ 1 trở lên)!');
+        guestInput.value = '';
         guestInput.focus();
         return;
       }
@@ -1180,6 +1221,11 @@ if (type === 'VIP') {
 
       const guests =
         parseInt(document.getElementById('guestCount').value || '0');
+
+      if (!Number.isInteger(guests) || guests < 1) {
+        alert(guests < 0 ? 'Số lượng khách không được là số âm!' : 'Số lượng khách không hợp lệ!');
+        return;
+      }
 
       const tableEl =
         document.querySelector(

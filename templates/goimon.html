@@ -196,6 +196,24 @@
         <i class="fa-solid ${x[1]} mr-2"></i>${x[2]}</button>`).join('');
   }
   function setTab(t) { tab = t; cat = 'ALL'; renderTabs(); loadAndRenderMenu(); }
+  // Tìm món: bỏ dấu, gõ tắt (ssm = sashimi, bcbm = ba chỉ bò mỏng...)
+  const _norm = s => String(s || '').toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  function matchName(name, q) {
+    q = _norm(q).replace(/\s+/g, '');
+    if (!q) return true;
+    const n = _norm(name);
+    const flat = n.replace(/[^a-z0-9]/g, '');
+    if (flat.includes(q)) return true;                                   // gõ liền: "bachi"
+    const words = n.split(/[^a-z0-9]+/).filter(Boolean);
+    if (words.map(w => w[0]).join('').includes(q)) return true;          // chữ cái đầu mỗi từ
+    // gõ tắt theo thứ tự chữ cái, chữ đầu trùng đầu một từ (ssm -> sashimi)
+    if (q.length >= 3 && words.some(w => w[0] === q[0])) {
+      let i = 0;
+      for (const ch of flat) if (ch === q[i]) i++;
+      if (i === q.length) return true;
+    }
+    return false;
+  }
   function onSearch(v) { search = v.trim().toLowerCase(); renderMenu(); }
   function setCat(c) { cat = c; renderMenu(); }
 
@@ -223,7 +241,7 @@
     const html = [];
     cats.forEach(g => {
       if (cat !== 'ALL' && cat !== g.name) return;
-      const items = g.items.filter(i => !search || i.name.toLowerCase().includes(search));
+      const items = g.items.filter(i => matchName(i.name, search));
       if (!items.length) return;
       html.push(`<h5 class="col-span-full text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">${esc(g.name)}</h5>`);
       items.forEach(i => {

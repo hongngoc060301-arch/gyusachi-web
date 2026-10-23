@@ -815,9 +815,18 @@ def compute_bill(o, items, guests=None, promo=None):
     free = guests // st['group_size'] if (apply and food_price) else 0
     discount = free * food_price
 
+    # VAT tính trên 1 đơn vị (vé buffet / nước / từng món) rồi nhân số lượng
+    unit_vat = lambda price: int(round(price * vat_rate))
+    food_vat = unit_vat(food_price) * guests
+    drink_vat = unit_vat(drink_price) * guests
+    for l in lines:
+        l['unit_vat'] = unit_vat(l['unit_price'])
+        l['vat'] = l['unit_vat'] * l['qty']
+    discount_vat = unit_vat(food_price) * free
+
     subtotal = food_amount + drink_amount + extra_amount
     taxable = subtotal - discount
-    vat = int(round(taxable * vat_rate))
+    vat = food_vat + drink_vat + sum(l['vat'] for l in lines) - discount_vat
 
     if free:
         note = f"{auto_reason if promo is None else 'Thu ngân áp dụng ưu đãi nhóm'}: miễn phí {free} suất"
@@ -832,7 +841,8 @@ def compute_bill(o, items, guests=None, promo=None):
         "drink_name": o['drink_name'], "drink_price": drink_price, "drink_amount": drink_amount,
         "lines": lines, "extra_amount": extra_amount,
         "promo_auto": auto_ok, "promo_applied": bool(free), "promo_free": free,
-        "promo_note": note, "discount": discount,
+        "promo_note": note, "discount": discount, "discount_vat": discount_vat,
+        "food_vat": food_vat, "drink_vat": drink_vat,
         "subtotal": subtotal, "vat_rate": vat_rate, "vat": vat, "total": taxable + vat,
     }
 
@@ -926,6 +936,15 @@ def api_cashier_bill(order_id):
     b = compute_bill(o, items, guests, parse_promo(request.args.get('promo')))
     b.update({"order_id": o['id'], "table_id": o['table_id'], "status": o['status'],
               "opened_at": o['opened_at'], "pending": pending_count(items)})
+    # thông tin in trên phiếu: tầng, nhân viên phục vụ, giờ vào đầy đủ
+    extra = query("""SELECT t.floor, s.name AS staff_name,
+                            to_char(o.created_at, 'DD/MM/YYYY') AS open_date,
+                            to_char(o.created_at, 'HH24:MI') AS open_time
+                     FROM orders o LEFT JOIN dining_tables t ON t.id = o.table_id
+                     LEFT JOIN staffs s ON s.id = o.staff_id WHERE o.id = %s""", (o['id'],), one=True)
+    if extra:
+        b.update({"floor": extra['floor'], "staff_name": extra['staff_name'],
+                  "open_date": extra['open_date'], "open_time": extra['open_time']})
     return jsonify({"success": True, "bill": b})
 
 
@@ -2621,9 +2640,6 @@ def test_db():
             "GROUP BY p.price ORDER BY p.price")]
     })
 
-@app.route('/manager/qr-ban')
-def manager_qr_ban():
-    return render_template('qr_ban.html')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
