@@ -2505,7 +2505,7 @@ def table_self_order(table_id):
     t = query("SELECT id, name FROM dining_tables WHERE id = %s AND is_active", (table_id.upper(),), one=True)
     if not t:
         return redirect(url_for('home'))
-    return render_template('goimon_ban.html', table=dict(t))
+    return render_template('goimon.html', table=dict(t))
 
 
 @app.route('/api/service-call/status')
