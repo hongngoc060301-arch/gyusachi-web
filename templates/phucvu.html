@@ -7,6 +7,7 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
@@ -91,6 +92,10 @@
       <p id="mTableInfo" class="text-sm text-slate-300 truncate"></p>
       <div id="mOrderInfo" class="flex flex-wrap gap-2 mt-1"></div>
     </div>
+    <button id="qrBtn" onclick="showQrModal()"
+      class="hidden px-3 md:px-4 py-2.5 rounded-xl bg-sky-500/15 border border-sky-500/40 text-sky-300 hover:bg-sky-500 hover:text-slate-950 font-bold text-sm transition">
+      <i class="fa-solid fa-qrcode md:mr-2"></i><span class="hidden md:inline">HIỆN QR</span>
+    </button>
     <button id="changeBtn" onclick="showChangeModal()"
       class="hidden px-3 md:px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-bold text-sm transition">
       <i class="fa-solid fa-ticket md:mr-2"></i><span class="hidden md:inline">ĐỔI VÉ</span>
@@ -192,6 +197,18 @@
   </section>
 </div>
 
+
+<!-- ================= HỘP MÃ QR CHO KHÁCH ================= -->
+<div id="qrModal" class="hidden fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4" onclick="if(event.target===this) closeQrModal()">
+  <div class="bg-white text-slate-900 rounded-3xl w-full max-w-sm p-6 text-center">
+    <p class="text-red-600 font-black tracking-[.3em] text-xs">GYU SACHI</p>
+    <h4 id="qrTitle" class="text-2xl font-black mt-1"></h4>
+    <p class="text-sm text-slate-600 mt-1">Quét mã để gọi món tại bàn</p>
+    <div id="qrCanvas" class="flex justify-center my-4"></div>
+    <p id="qrUrl" class="text-[10px] text-slate-400 break-all"></p>
+    <button onclick="closeQrModal()" class="mt-4 w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-sm">ĐÓNG</button>
+  </div>
+</div>
 
 <!-- ================= HỘP ĐỔI VÉ BUFFET ================= -->
 <div id="changeModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4">
@@ -375,6 +392,7 @@
     document.getElementById('openForm').classList.add('hidden');
     document.getElementById('orderView').classList.add('hidden');
     document.getElementById('changeBtn').classList.add('hidden');
+    document.getElementById('qrBtn').classList.add('hidden');
 
     const r = await api('/api/orders/by-table/' + encodeURIComponent(id));
 
@@ -499,6 +517,7 @@
     document.getElementById('openForm').classList.add('hidden');
     document.getElementById('orderView').classList.remove('hidden');
     document.getElementById('changeBtn').classList.remove('hidden');
+    document.getElementById('qrBtn').classList.remove('hidden');
 
     // tab mặc định
     tab = ORDER.package_id ? 'food' : (ORDER.drink_package_id ? 'drink' : 'alacarte');
@@ -860,6 +879,27 @@
     renderSent();
     toast('Đã huỷ món', true);
   }
+
+
+  // ============ MÃ QR CỦA BÀN CHO KHÁCH QUÉT ============
+  function showQrModal() {
+    if (!CUR_TABLE) return;
+    const url = location.origin + '/ban/' + encodeURIComponent(CUR_TABLE.id);
+    document.getElementById('qrTitle').textContent = 'Bàn ' + (CUR_TABLE.name || CUR_TABLE.id);
+    document.getElementById('qrUrl').textContent = url;
+    const box = document.getElementById('qrCanvas');
+    try {
+      const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+      const n = qr.getModuleCount(), Q = 4, size = n + Q * 2;
+      let path = '';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) path += `M${c + Q} ${r + Q}h1v1h-1z`;
+      box.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" style="width:260px;height:260px;shape-rendering:crispEdges"><rect width="${size}" height="${size}" fill="#fff"/><path d="${path}" fill="#000"/></svg>`;
+    } catch (e) {
+      box.textContent = 'Không tạo được mã QR. Link: ' + url;
+    }
+    document.getElementById('qrModal').classList.remove('hidden');
+  }
+  function closeQrModal() { document.getElementById('qrModal').classList.add('hidden'); }
 
 
   // ============ ĐỔI VÉ BUFFET ============
