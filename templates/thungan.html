@@ -13,6 +13,8 @@
     body { font-family: 'Plus Jakarta Sans', sans-serif; background: #050505; }
     .chip.active { background: #dc2626; border-color: #dc2626; color: #fff; }
     .seg.active { background: #f59e0b; color: #0f172a; }
+    .vchip { padding: .5rem .85rem; border-radius: .75rem; border: 1px solid #334155; background: #0f172a; font-size: .8rem; font-weight: 700; color: #cbd5e1; }
+    .vchip.active { background: #f59e0b; border-color: #f59e0b; color: #0f172a; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
 
     /* In hoá đơn: chỉ in phần #receipt (khổ giấy 80mm, mẫu phiếu tạm tính) */
@@ -52,7 +54,10 @@
   <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center">
     <p class="text-red-500 font-black tracking-[.3em] text-xs">GYU SACHI</p>
     <h1 class="text-2xl font-black mt-1">QUẦY THU NGÂN</h1>
-    <p class="text-slate-400 text-xs mt-1">Nhập mật khẩu quầy thu ngân</p>
+    <p class="text-slate-400 text-xs mt-1">Chọn người đang thu ngân và nhập mật khẩu quầy</p>
+
+    <p class="text-slate-500 text-[11px] font-bold uppercase tracking-widest mt-5">Ai đang thu ngân?</p>
+    <div id="cashierPick" class="mt-2 flex flex-wrap justify-center gap-2"></div>
 
     <input id="pinInput" type="password" maxlength="30" autocomplete="off"
       onkeydown="if(event.key==='Enter') login()"
@@ -145,6 +150,13 @@
             </div>
           </div>
           <p id="bPromoNote" class="text-xs mt-2 text-slate-400"></p>
+        </div>
+
+        <!-- thẻ tích điểm (GIFT VOUCHER) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+          <span class="text-sm font-bold text-slate-300"><i class="fa-solid fa-ticket mr-2 text-amber-400"></i>Thẻ tích điểm — chọn mốc giảm</span>
+          <div id="voucherChips" class="flex flex-wrap gap-2 mt-3"></div>
+          <p id="voucherNote" class="text-xs mt-2 text-slate-500"></p>
         </div>
 
         <!-- chi tiết tiền -->
@@ -268,19 +280,35 @@
 
 
   // ============ ĐĂNG NHẬP ============
+  // Chọn người thu ngân (mặc định: Phương). Tên này được ghi vào hoá đơn (cột cashier_id) và in trên phiếu.
+  let CASHIER_PICK = null, CASHIER_LIST = [];
+  async function loadCashiers() {
+    const r = await api('/api/cashier/staff');
+    CASHIER_LIST = r.staff || [];
+    if (!CASHIER_PICK) CASHIER_PICK = r.default_id || (CASHIER_LIST[0] && CASHIER_LIST[0].id) || null;
+    renderCashierPick();
+  }
+  function renderCashierPick() {
+    document.getElementById('cashierPick').innerHTML = CASHIER_LIST.map(s =>
+      `<button type="button" onclick="pickCashier('${esc(s.id)}')"
+         class="chip ${s.id === CASHIER_PICK ? 'active' : ''} px-3 py-2 rounded-xl border border-slate-700 text-sm font-bold transition">${esc(s.name)}</button>`
+    ).join('');
+  }
+  function pickCashier(id) { CASHIER_PICK = id; renderCashierPick(); document.getElementById('pinInput').focus(); }
+
   async function login() {
     const pin = document.getElementById('pinInput').value.trim();
     const err = document.getElementById('loginError');
     err.classList.add('hidden');
     if (!pin) return;
 
-    const r = await api('/api/cashier/login', { password: pin });
+    const r = await api('/api/cashier/login', { password: pin, staff_id: CASHIER_PICK });
     if (!r.success) {
       err.textContent = r.message || 'Đăng nhập không được';
       err.classList.remove('hidden');
       return;
     }
-    CASHIER = { name: 'Thu ngân', role: 'Quầy thu ngân' };
+    CASHIER = { id: r.id, name: r.name, role: 'Quầy thu ngân' };
     enterApp();
   }
 
@@ -340,7 +368,7 @@
 
   // ============ HOÁ ĐƠN ============
   async function selectOrder(id) {
-    CUR = { orderId: id, guests: null, promo: 'auto', method: null };
+    CUR = { orderId: id, guests: null, promo: 'auto', voucher: null, method: null };
     document.getElementById('cashIn').value = '';
     document.getElementById('payError').classList.add('hidden');
     renderOrders();
@@ -351,6 +379,7 @@
     if (!CUR) return;
     const seq = ++billSeq;
     let url = '/api/cashier/bill/' + CUR.orderId + '?promo=' + CUR.promo;
+    if (CUR.voucher) url += '&voucher=' + encodeURIComponent(CUR.voucher);
     if (CUR.guests) url += '&guests=' + CUR.guests;
 
     const r = await api(url);
@@ -382,7 +411,23 @@
     loadBill();
   }
 
-  function setPromo(p) { CUR.promo = p; loadBill(); }
+  function setPromo(p) { CUR.promo = p; CUR.voucher = null; loadBill(); }
+
+  // Mốc thẻ tích điểm: bấm lần nữa để bỏ chọn. Chọn mốc thì tắt "đi 4 tính 3" (chỉ áp dụng 1 trong 2).
+  function setVoucher(code) {
+    if (CUR.voucher === code) { CUR.voucher = null; CUR.promo = 'auto'; }
+    else { CUR.voucher = code; CUR.promo = 'off'; }
+    loadBill();
+  }
+  function renderVouchers() {
+    const box = document.getElementById('voucherChips');
+    box.innerHTML = (BILL.vouchers || []).map(v =>
+      `<button type="button" onclick="setVoucher('${v.code}')" class="vchip ${CUR.voucher === v.code ? 'active' : ''}">${esc(v.label)}</button>`).join('');
+    const n = document.getElementById('voucherNote');
+    if (BILL.voucher_error) { n.className = 'text-xs mt-2 text-amber-400'; n.textContent = BILL.voucher_error; }
+    else if (BILL.voucher_applied) { n.className = 'text-xs mt-2 text-emerald-400'; n.textContent = 'Đang áp dụng: ' + BILL.voucher_label; }
+    else { n.className = 'text-xs mt-2 text-slate-500'; n.textContent = 'Không áp dụng ngày Lễ/Tết. Chọn 1 mốc để giảm (thay cho "đi 4 tính 3").'; }
+  }
 
   function setMethod(m) {
     CUR.method = m;
@@ -401,7 +446,8 @@
     document.getElementById('bGuests').textContent = BILL.guests;
 
     ['Auto', 'On', 'Off'].forEach(k =>
-      document.getElementById('seg' + k).classList.toggle('active', CUR.promo === k.toLowerCase()));
+      document.getElementById('seg' + k).classList.toggle('active', !CUR.voucher && CUR.promo === k.toLowerCase()));
+    renderVouchers();
     document.getElementById('bPromoNote').innerHTML =
       (BILL.promo_applied ? '<i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i>' : '<i class="fa-solid fa-circle-info mr-1"></i>') +
       esc(BILL.promo_note);
@@ -512,7 +558,7 @@
 
     const r = await api('/api/cashier/pay/' + CUR.orderId, {
       method: CUR.method, guests: CUR.guests,
-      promo: CUR.promo, force: !!force
+      promo: CUR.promo, voucher: CUR.voucher, force: !!force
     });
 
     if (r.pending) {
@@ -552,7 +598,8 @@
     if (BILL.food_name)  rows.push(tr(BILL.food_name, BILL.guests, BILL.food_price, BILL.food_vat, BILL.food_amount));
     if (BILL.drink_name) rows.push(tr(BILL.drink_name, BILL.guests, BILL.drink_price, BILL.drink_vat, BILL.drink_amount));
     BILL.lines.forEach(l => rows.push(tr(l.name, l.qty, l.unit_price, l.vat, l.amount)));
-    if (BILL.discount) rows.push(tr('Ưu đãi nhóm (miễn ' + BILL.promo_free + ' suất)', BILL.promo_free, -BILL.food_price, -BILL.discount_vat, -BILL.discount));
+    if (BILL.discount && BILL.voucher_applied) rows.push(tr('Thẻ tích điểm: ' + (BILL.voucher_label || ''), 1, -BILL.discount, -BILL.discount_vat, -BILL.discount));
+    else if (BILL.discount) rows.push(tr('Ưu đãi nhóm (miễn ' + BILL.promo_free + ' suất)', BILL.promo_free, -BILL.food_price, -BILL.discount_vat, -BILL.discount));
 
     const sr = (a, b, cls) => `<div class="r ${cls || ''}"><span>${a}</span><span>${b}</span></div>`;
     const floorTxt = (BILL.floor ? 'TẦNG ' + BILL.floor + ' - ' : '') + BILL.table_id;
@@ -629,7 +676,9 @@
   // ============ KHỞI TẠO ============
   (async function init() {
     const r = await api('/api/cashier/me');
-    if (r.logged_in) { CASHIER = { name: 'Thu ngân', role: 'Quầy thu ngân' }; enterApp(); return; }
+    // phiên đăng nhập cũ (chưa chọn người thu ngân) thì cho chọn lại để hoá đơn ghi đúng tên
+    if (r.logged_in && r.id) { CASHIER = { id: r.id, name: r.name, role: 'Quầy thu ngân' }; enterApp(); return; }
+    loadCashiers();
     document.getElementById('pinInput').focus();
   })();
 

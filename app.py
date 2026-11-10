@@ -2,7 +2,7 @@ import csv
 import io
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, Response, g
@@ -36,6 +36,10 @@ CATEGORY_ORDER = [
 
 FOOD_PACKAGE_MIN_PRICE = 150000     # từ 150K trở lên là buffet đồ ăn, dưới là buffet nước
 
+BUFFET_MINUTES = 120                # thời gian gọi món buffet, tính từ món đầu tiên của bàn
+BUFFET_WARN_MINUTES = 15            # báo sắp hết giờ khi còn ngần này phút
+DESSERT_CATEGORY = 'Tráng miệng'    # hết giờ thì khách (qua QR) chỉ còn gọi được nhóm này
+
 
 def group_by_category(rows):
     """[{category, ...}] -> [{name, items:[...]}] theo đúng thứ tự menu."""
@@ -48,6 +52,14 @@ def group_by_category(rows):
 
     return [{"name": name, "items": groups[name]}
             for name in sorted(groups, key=sort_key)]
+
+
+VN_TZ = timezone(timedelta(hours=7))      # giờ Việt Nam (máy chủ Render chạy giờ UTC; VN không có giờ mùa hè)
+
+
+def vn_now():
+    """Giờ hiện tại ở Việt Nam (không kèm múi giờ). Ngày/giờ khách đặt bàn là giờ Việt Nam nên dùng hàm này để so sánh."""
+    return datetime.now(VN_TZ).replace(tzinfo=None)
 
 
 class OrderError(Exception):
@@ -283,14 +295,25 @@ def api_tables():
     """Danh sách bàn + trạng thái hiện tại (để tô màu bàn đang dùng)."""
     rows = query("""
         SELECT t.id, t.name, t.capacity, t.min_capacity, t.floor, t.type, t.status,
-               o.id AS order_id, o.guests
+               o.id AS order_id, o.guests, o.package_id, o.drink_package_id,
+               (o.package_id IS NOT NULL OR o.drink_package_id IS NOT NULL) AS has_buffet,
+               (SELECT EXTRACT(EPOCH FROM (NOW() - MIN(oi.created_at)))::int
+                  FROM order_items oi WHERE oi.order_id = o.id) AS elapsed_sec,
+               rv.id AS res_id, rv.guests AS res_guests, rv.tm AS res_time
         FROM dining_tables t
         LEFT JOIN orders o ON o.table_id = t.id AND o.status = 'OPEN'
+        LEFT JOIN LATERAL (                       -- đơn đặt bàn hôm nay (chưa đến) gần nhất của bàn
+            SELECT r.id, r.guests, to_char(r.reserve_time, 'HH24:MI') AS tm
+            FROM reservations r
+            WHERE r.table_id = t.id AND r.reserve_date = %s AND r.status IN ('PENDING', 'CONFIRMED')
+            ORDER BY r.reserve_time LIMIT 1
+        ) rv ON TRUE
         WHERE t.is_active
         ORDER BY t.floor, (t.type = 'VIP'),
                  NULLIF(regexp_replace(t.id, '\\D', '', 'g'), '')::int, t.id
-    """)
-    return jsonify({"tables": [dict(r) for r in rows]})
+    """, (vn_now().date(),))
+    return jsonify({"tables": [dict(r) for r in rows],
+                    "limit_sec": BUFFET_MINUTES * 60, "warn_sec": BUFFET_WARN_MINUTES * 60})
 
 
 @app.route('/api/packages')
@@ -371,7 +394,43 @@ def order_detail(order_id):
 
     o = dict(o)
     o['items'] = [dict(i) for i in items]
+
+    # Đồng hồ buffet: tính từ món đầu tiên của bàn (kể cả món sau đó bị huỷ, để không "reset" giờ bằng cách huỷ món)
+    first = query("SELECT EXTRACT(EPOCH FROM (NOW() - MIN(created_at)))::int AS e "
+                  "FROM order_items WHERE order_id = %s", (order_id,), one=True)
+    has_buffet = bool(o['package_id'] or o['drink_package_id'])
+    o['limit_min'] = BUFFET_MINUTES
+    o['seconds_left'] = (BUFFET_MINUTES * 60 - first['e']) if (has_buffet and first and first['e'] is not None) else None
     return o
+
+
+@app.route('/api/table/<table_id>/summary')
+def api_table_summary(table_id):
+    """Khách xem trên trang QR: đã gọi bao nhiêu phần + tạm tính. Cùng công thức với màn hình thu ngân
+    (có VAT, có ưu đãi nhóm nếu được áp dụng) nhưng chỉ là TẠM TÍNH: thu ngân có thể chỉnh số khách / ưu đãi."""
+    row = query("SELECT id FROM orders WHERE table_id = %s AND status = 'OPEN'", (table_id.upper(),), one=True)
+    if not row:
+        return jsonify({"success": True, "summary": None})
+    o, items = load_order_for_bill(row['id'])
+    b = compute_bill(o, items)
+
+    live = [i for i in items if i['status'] != 'CANCELLED']
+    top = [i for i in live if i['parent_id'] is None]            # PACKAGE / ALACARTE / COMBO (mỗi combo = 1 phần)
+    served = 0
+    for i in top:
+        kids = [c for c in live if c['parent_id'] == i['id']]
+        if (kids and all(c['status'] == 'DONE' for c in kids)) or (not kids and i['status'] == 'DONE'):
+            served += i['qty']
+    dishes = sum(i['qty'] for i in top)
+
+    return jsonify({"success": True, "summary": {
+        "dishes": dishes, "served": served, "waiting": dishes - served,
+        "guests": b['guests'],
+        "food_name": b['food_name'], "food_price": b['food_price'], "food_amount": b['food_amount'],
+        "drink_name": b['drink_name'], "drink_price": b['drink_price'], "drink_amount": b['drink_amount'],
+        "lines": [{"name": l['name'], "qty": l['qty'], "amount": l['amount']} for l in b['lines']],
+        "discount": b['discount'], "promo_free": b['promo_free'],
+        "vat": b['vat'], "total": b['total']}})
 
 
 @app.route('/api/orders/by-table/<table_id>')
@@ -389,57 +448,167 @@ def api_order(order_id):
     return jsonify({"success": True, "order": o})
 
 
+def parse_guests(value):
+    """Đọc số khách (1..60) từ dữ liệu gửi lên. Raise OrderError nếu sai."""
+    try:
+        guests = int(value)
+    except (TypeError, ValueError):
+        raise OrderError("Số khách không hợp lệ.")
+    if not 1 <= guests <= 60:
+        raise OrderError("Số khách phải từ 1 đến 60.")
+    return guests
+
+
+def open_order_tx(cur, table_id, staff_id, guests, package_id, drink_id):
+    """Mở bàn (tạo đơn OPEN + đánh dấu bàn đang dùng) bên trong 1 transaction có sẵn. Trả về id đơn.
+    Dùng chung cho 'Mở bàn' thường và 'Khách đặt bàn đã đến'. Raise OrderError nếu sai."""
+    cur.execute("SELECT id FROM dining_tables WHERE id = %s AND is_active FOR UPDATE", (table_id,))
+    if not cur.fetchone():
+        raise OrderError("Không tìm thấy bàn.")
+
+    cur.execute("SELECT id FROM orders WHERE table_id = %s AND status = 'OPEN'", (table_id,))
+    if cur.fetchone():
+        raise OrderError("Bàn này đang có khách, hãy tải lại trang.")
+
+    cur.execute("SELECT id FROM staffs WHERE id = %s AND is_active", (staff_id,))
+    if not cur.fetchone():
+        raise OrderError("Không tìm thấy nhân viên.")
+
+    if package_id:
+        cur.execute("SELECT price FROM packages WHERE id = %s AND is_active", (package_id,))
+        p = cur.fetchone()
+        if not p or p['price'] < FOOD_PACKAGE_MIN_PRICE:
+            raise OrderError("Gói buffet đồ ăn không hợp lệ.")
+
+    if drink_id:
+        cur.execute("SELECT price FROM packages WHERE id = %s AND is_active", (drink_id,))
+        p = cur.fetchone()
+        if not p or p['price'] >= FOOD_PACKAGE_MIN_PRICE:
+            raise OrderError("Gói buffet nước không hợp lệ.")
+
+    cur.execute("""
+        INSERT INTO orders (table_id, staff_id, package_id, drink_package_id, guests)
+        VALUES (%s, %s, %s, %s, %s) RETURNING id
+    """, (table_id, staff_id, package_id, drink_id, guests))
+    order_id = cur.fetchone()['id']
+
+    cur.execute("UPDATE dining_tables SET status = 'OCCUPIED' WHERE id = %s", (table_id,))
+    return order_id
+
+
 @app.route('/api/orders/open', methods=['POST'])
 def api_open_order():
     """Mở bàn: tạo đơn mới cho bàn."""
     data = request.get_json() or {}
-    table_id = data.get('table_id')
-    staff_id = data.get('staff_id')
-
     try:
-        guests = int(data.get('guests', 1))
-    except (TypeError, ValueError):
-        return fail("Số khách không hợp lệ.")
-    if not 1 <= guests <= 60:
-        return fail("Số khách phải từ 1 đến 60.")
+        guests = parse_guests(data.get('guests', 1))
+        with transaction() as cur:
+            order_id = open_order_tx(cur, data.get('table_id'), data.get('staff_id'), guests,
+                                     data.get('package_id') or None, data.get('drink_package_id') or None)
+    except OrderError as e:
+        return fail(str(e))
 
-    package_id = data.get('package_id') or None
-    drink_id = data.get('drink_package_id') or None
+    return jsonify({"success": True, "order": order_detail(order_id)})
 
+
+@app.route('/api/orders/<int:order_id>/move', methods=['POST'])
+def api_move_order(order_id):
+    """Chuyển bàn: đưa nguyên đơn đang mở sang một bàn TRỐNG khác (món, vé, đồng hồ 120 phút đều giữ nguyên).
+    Trả về cảnh báo (không chặn) nếu bàn mới thiếu chỗ hoặc sắp có khách đặt."""
+    to_id = str((request.get_json() or {}).get('to_table_id') or '')
+    warnings = []
     try:
         with transaction() as cur:
-            cur.execute("SELECT id FROM dining_tables WHERE id = %s AND is_active FOR UPDATE", (table_id,))
-            if not cur.fetchone():
-                raise OrderError("Không tìm thấy bàn.")
+            cur.execute("SELECT id, table_id, status, guests FROM orders WHERE id = %s FOR UPDATE", (order_id,))
+            o = cur.fetchone()
+            if not o:
+                raise OrderError("Không tìm thấy đơn.")
+            if o['status'] != 'OPEN':
+                raise OrderError("Đơn này đã kết thúc.")
+            if o['table_id'] == to_id:
+                raise OrderError("Hãy chọn một bàn khác với bàn hiện tại.")
 
-            cur.execute("SELECT id FROM orders WHERE table_id = %s AND status = 'OPEN'", (table_id,))
+            cur.execute("""SELECT id, name, capacity, min_capacity, type FROM dining_tables
+                           WHERE id = %s AND is_active FOR UPDATE""", (to_id,))
+            t = cur.fetchone()
+            if not t:
+                raise OrderError("Không tìm thấy bàn muốn chuyển tới.")
+            cur.execute("SELECT 1 FROM orders WHERE table_id = %s AND status = 'OPEN'", (to_id,))
             if cur.fetchone():
-                raise OrderError("Bàn này đang có khách, hãy tải lại trang.")
+                raise OrderError(f"Bàn {t['name'] or t['id']} đang có khách. Muốn nhập chung hai bàn hãy dùng 'Gộp bàn'.")
 
-            cur.execute("SELECT id FROM staffs WHERE id = %s AND is_active", (staff_id,))
-            if not cur.fetchone():
-                raise OrderError("Không tìm thấy nhân viên.")
+            cur.execute("UPDATE orders SET table_id = %s WHERE id = %s", (to_id, order_id))
+            cur.execute("UPDATE dining_tables SET status = 'AVAILABLE' WHERE id = %s", (o['table_id'],))
+            cur.execute("UPDATE dining_tables SET status = 'OCCUPIED' WHERE id = %s", (to_id,))
+            cur.execute("UPDATE service_calls SET table_id = %s WHERE order_id = %s AND status = 'OPEN'",
+                        (to_id, order_id))
 
-            if package_id:
-                cur.execute("SELECT price FROM packages WHERE id = %s AND is_active", (package_id,))
-                p = cur.fetchone()
-                if not p or p['price'] < FOOD_PACKAGE_MIN_PRICE:
-                    raise OrderError("Gói buffet đồ ăn không hợp lệ.")
+            guests = o['guests'] or 0
+            if t['type'] == 'VIP' and guests < (t['min_capacity'] or 1):
+                warnings.append(f"Phòng VIP {t['id']} nhận từ {t['min_capacity']} khách (bàn đang có {guests}).")
+            elif guests > t['capacity']:
+                warnings.append(f"Bàn {t['id']} chỉ có {t['capacity']} chỗ (bàn đang có {guests} khách).")
 
-            if drink_id:
-                cur.execute("SELECT price FROM packages WHERE id = %s AND is_active", (drink_id,))
-                p = cur.fetchone()
-                if not p or p['price'] >= FOOD_PACKAGE_MIN_PRICE:
-                    raise OrderError("Gói buffet nước không hợp lệ.")
-
+            now = vn_now()
             cur.execute("""
-                INSERT INTO orders (table_id, staff_id, package_id, drink_package_id, guests)
-                VALUES (%s, %s, %s, %s, %s) RETURNING id
-            """, (table_id, staff_id, package_id, drink_id, guests))
-            order_id = cur.fetchone()['id']
+                SELECT to_char(reserve_time, 'HH24:MI') AS tm FROM reservations
+                WHERE table_id = %s AND reserve_date = %s AND status IN ('PENDING', 'CONFIRMED')
+                  AND reserve_time BETWEEN %s AND %s
+                ORDER BY reserve_time LIMIT 1""",
+                (to_id, now.date(), (now - timedelta(minutes=30)).time(), (now + timedelta(minutes=RESERVE_GAP_MIN)).time()))
+            soon = cur.fetchone()
+            if soon:
+                warnings.append(f"Bàn {t['id']} có khách đặt lúc {soon['tm']}.")
+    except OrderError as e:
+        return fail(str(e))
 
-            cur.execute("UPDATE dining_tables SET status = 'OCCUPIED' WHERE id = %s", (table_id,))
+    return jsonify({"success": True, "order": order_detail(order_id), "warnings": warnings})
 
+
+@app.route('/api/orders/<int:order_id>/merge', methods=['POST'])
+def api_merge_orders(order_id):
+    """Gộp bàn: chuyển toàn bộ món + số khách của bàn khác (from_table_id) vào đơn này; bàn kia trở về trống.
+    Chỉ gộp được khi hai bàn dùng cùng vé buffet (vì hoá đơn tính 1 vé × số khách)."""
+    from_table = str((request.get_json() or {}).get('from_table_id') or '')
+    try:
+        with transaction() as cur:
+            cur.execute("SELECT id FROM orders WHERE table_id = %s AND status = 'OPEN'", (from_table,))
+            src = cur.fetchone()
+            if not src:
+                raise OrderError("Bàn cần gộp hiện không có khách.")
+            if src['id'] == order_id:
+                raise OrderError("Không thể gộp một bàn vào chính nó.")
+
+            # khoá theo thứ tự id để 2 người gộp cùng lúc không bị kẹt nhau
+            cur.execute("""SELECT id, table_id, status, guests, package_id, drink_package_id FROM orders
+                           WHERE id = ANY(%s) ORDER BY id FOR UPDATE""", ([order_id, src['id']],))
+            rows = {r['id']: r for r in cur.fetchall()}
+            main, other = rows.get(order_id), rows.get(src['id'])
+            if not main or not other or main['status'] != 'OPEN' or other['status'] != 'OPEN' \
+                    or other['table_id'] != from_table:
+                raise OrderError("Một trong hai bàn vừa thay đổi, hãy tải lại trang rồi thử lại.")
+
+            if main['package_id'] != other['package_id'] or main['drink_package_id'] != other['drink_package_id']:
+                raise OrderError("Hai bàn đang dùng vé buffet khác nhau. Hãy dùng 'Đổi vé' cho giống nhau rồi gộp lại.")
+
+            total = (main['guests'] or 0) + (other['guests'] or 0)
+            if total > 60:
+                raise OrderError("Tổng số khách sau khi gộp vượt quá 60.")
+
+            cur.execute("UPDATE order_items SET order_id = %s WHERE order_id = %s", (order_id, other['id']))
+            cur.execute("UPDATE orders SET guests = %s WHERE id = %s", (total, order_id))
+
+            # yêu cầu đang chờ của bàn kia: trùng loại với bàn này thì coi như đã xử lý, còn lại chuyển sang bàn này
+            cur.execute("""UPDATE service_calls c SET status = 'DONE', done_at = NOW(), done_by = 'Gộp bàn'
+                           WHERE c.order_id = %s AND c.status = 'OPEN'
+                             AND EXISTS (SELECT 1 FROM service_calls m
+                                         WHERE m.table_id = %s AND m.kind = c.kind AND m.status = 'OPEN')""",
+                        (other['id'], main['table_id']))
+            cur.execute("UPDATE service_calls SET table_id = %s, order_id = %s WHERE order_id = %s AND status = 'OPEN'",
+                        (main['table_id'], order_id, other['id']))
+
+            cur.execute("DELETE FROM orders WHERE id = %s", (other['id'],))        # đã chuyển hết món nên đơn rỗng
+            cur.execute("UPDATE dining_tables SET status = 'AVAILABLE' WHERE id = %s", (from_table,))
     except OrderError as e:
         return fail(str(e))
 
@@ -541,6 +710,25 @@ def api_add_items(order_id):
             cur.execute("SELECT COALESCE(MAX(id), 0) AS m FROM order_items")
             first_new = cur.fetchone()['m']
 
+            # Khách tự gọi qua QR mà đã quá giờ buffet: chỉ còn gọi được tráng miệng (nhân viên vẫn gọi được bình thường)
+            if data.get('source') == 'QR' and package_ids:
+                cur.execute("""SELECT EXTRACT(EPOCH FROM (NOW() - MIN(created_at)))::int AS e
+                               FROM order_items WHERE order_id = %s""", (order_id,))
+                e = cur.fetchone()['e']
+                if e is not None and e >= BUFFET_MINUTES * 60:
+                    msg = (f"Đã hết {BUFFET_MINUTES} phút gọi món. Quý khách chỉ còn gọi thêm được tráng miệng, "
+                           "hoặc bấm 'Gọi nhân viên' / 'Xin tính tiền'.")
+                    if not all(it.get('type') == 'PACKAGE' for it in items):
+                        raise OrderError(msg)
+                    try:
+                        ids = {int(it.get('id')) for it in items}
+                    except (TypeError, ValueError):
+                        raise OrderError(msg)
+                    cur.execute("SELECT COUNT(*) AS n FROM menu_items WHERE id = ANY(%s) AND category = %s",
+                                (list(ids), DESSERT_CATEGORY))
+                    if cur.fetchone()['n'] != len(ids):
+                        raise OrderError(msg)
+
             for it in items:
                 try:
                     qty = int(it.get('qty', 1))
@@ -609,9 +797,9 @@ def api_add_items(order_id):
                                 raise OrderError(f"Hãy chọn món cho: {p['item_name']}")
                             name = pick
                         cur.execute("""
-                            INSERT INTO order_items (order_id, parent_id, kind, name, station_id, qty, unit_price)
-                            VALUES (%s, %s, 'COMBO_PART', %s, %s, %s, 0)
-                        """, (order_id, parent_id, name, p['station_code'], p['quantity'] * qty))
+                            INSERT INTO order_items (order_id, parent_id, kind, name, station_id, qty, unit_price, note)
+                            VALUES (%s, %s, 'COMBO_PART', %s, %s, %s, 0, %s)
+                        """, (order_id, parent_id, name, p['station_code'], p['quantity'] * qty, note))   # món con gửi bếp nên cũng mang ghi chú
 
                 else:
                     raise OrderError("Loại món không hợp lệ.")
@@ -791,7 +979,23 @@ def promo_auto(opened_at):
     return False, f"Buffet tối ngoài {days_label(st['dinner_days'])} không áp dụng {promo}"
 
 
-def compute_bill(o, items, guests=None, promo=None):
+# Các mốc ưu đãi trên thẻ tích điểm (GIFT VOUCHER). Mỗi lần chỉ áp dụng 1 mốc,
+# và không dùng chung với "đi 4 tính 3" (thẻ ghi: áp dụng 1 trong 2 chương trình, không áp dụng ngày Lễ/Tết).
+VOUCHERS = [
+    {"code": "P5",    "label": "Giảm 5%",                  "kind": "PERCENT", "value": 5},
+    {"code": "GIFT2", "label": "Free 2 ly nước dưới 32k",  "kind": "GIFT",    "value": 2},
+    {"code": "A100",  "label": "Voucher 100K",             "kind": "AMOUNT",  "value": 100000},
+    {"code": "A150",  "label": "Voucher 150K",             "kind": "AMOUNT",  "value": 150000},
+    {"code": "P15",   "label": "Giảm 15%",                 "kind": "PERCENT", "value": 15},
+    {"code": "A300",  "label": "Voucher 300K",             "kind": "AMOUNT",  "value": 300000},
+    {"code": "T20",   "label": "Vé buffet off 20%",        "kind": "TICKET",  "value": 20},
+]
+VOUCHER_MAP = {v['code']: v for v in VOUCHERS}
+GIFT_DRINK_STATION = 'ST01'      # Quầy Pha Chế
+GIFT_DRINK_MAX_PRICE = 32000     # "dưới 32k"
+
+
+def compute_bill(o, items, guests=None, promo=None, voucher=None):
     """Tính hoá đơn. o: dòng đơn (có created_at dạng datetime), items: các dòng order_items.
     promo: None = tự động theo giờ/ngày, True = ép áp dụng, False = ép bỏ."""
     guests = int(guests or o['guests'] or 1)
@@ -825,10 +1029,58 @@ def compute_bill(o, items, guests=None, promo=None):
     discount_vat = unit_vat(food_price) * free
 
     subtotal = food_amount + drink_amount + extra_amount
-    taxable = subtotal - discount
-    vat = food_vat + drink_vat + sum(l['vat'] for l in lines) - discount_vat
+    vat_full = food_vat + drink_vat + sum(l['vat'] for l in lines)
 
-    if free:
+    # ---- mốc thẻ tích điểm ----
+    v = VOUCHER_MAP.get(voucher) if voucher else None
+    voucher_error = None
+    voucher_label = None
+    if voucher and not v:
+        voucher_error = "Mốc ưu đãi không hợp lệ."
+    elif v:
+        voucher_label = v['label']
+        if promo is True:
+            voucher_error = "Chỉ áp dụng 1 trong 2: thẻ tích điểm hoặc đi 4 tính 3."
+        elif is_holiday(o['created_at'].date() if hasattr(o['created_at'], 'date') else datetime.fromisoformat(str(o['created_at'])).date()):
+            voucher_error = "Ngày Lễ/Tết không áp dụng ưu đãi thẻ tích điểm."
+        else:
+            free = 0
+            gross = subtotal + vat_full
+            if v['kind'] == 'PERCENT':
+                discount = int(round(subtotal * v['value'] / 100))
+                discount_vat = int(round(vat_full * v['value'] / 100))
+            elif v['kind'] == 'TICKET':
+                discount = int(round(food_amount * v['value'] / 100))
+                discount_vat = int(round(food_vat * v['value'] / 100))
+            elif v['kind'] == 'AMOUNT':
+                amt = min(v['value'], gross)
+                discount_vat = int(round(amt * vat_rate / (1 + vat_rate)))
+                discount = amt - discount_vat
+            else:   # GIFT: tối đa N ly nước ở quầy pha chế có giá dưới 32k, ưu tiên ly đắt nhất
+                units = []
+                for i in items:
+                    if (i['parent_id'] is None and i['kind'] == 'ALACARTE' and i['status'] != 'CANCELLED'
+                            and i.get('station_id') == GIFT_DRINK_STATION and int(i['unit_price']) < GIFT_DRINK_MAX_PRICE):
+                        units += [int(i['unit_price'])] * i['qty']
+                units = sorted(units, reverse=True)[:v['value']]
+                discount = sum(units)
+                discount_vat = sum(unit_vat(u) for u in units)
+                if not units:
+                    voucher_error = "Bàn chưa gọi nước nào dưới 32K ở quầy pha chế để tặng."
+            if not voucher_error:
+                voucher_label = v['label'] + (f" (giảm {discount + discount_vat:,}đ)".replace(',', '.'))
+    voucher_applied = bool(v and not voucher_error)
+    if v and voucher_error:
+        discount = discount_vat = free = 0
+
+    taxable = subtotal - discount
+    vat = vat_full - discount_vat
+
+    if voucher_applied:
+        note = f"Thẻ tích điểm: {voucher_label}"
+    elif v and voucher_error:
+        note = voucher_error
+    elif free:
         note = f"{auto_reason if promo is None else 'Thu ngân áp dụng ưu đãi nhóm'}: miễn phí {free} suất"
     elif promo is False:
         note = "Thu ngân bỏ ưu đãi nhóm"
@@ -841,6 +1093,9 @@ def compute_bill(o, items, guests=None, promo=None):
         "drink_name": o['drink_name'], "drink_price": drink_price, "drink_amount": drink_amount,
         "lines": lines, "extra_amount": extra_amount,
         "promo_auto": auto_ok, "promo_applied": bool(free), "promo_free": free,
+        "voucher": voucher if v else None, "voucher_applied": voucher_applied,
+        "voucher_label": voucher_label if voucher_applied else None, "voucher_error": voucher_error,
+        "vouchers": VOUCHERS,
         "promo_note": note, "discount": discount, "discount_vat": discount_vat,
         "food_vat": food_vat, "drink_vat": drink_vat,
         "subtotal": subtotal, "vat_rate": vat_rate, "vat": vat, "total": taxable + vat,
@@ -858,7 +1113,7 @@ def load_order_for_bill(order_id, cur=None):
         LEFT JOIN packages p ON p.id = o.package_id
         LEFT JOIN packages d ON d.id = o.drink_package_id
         WHERE o.id = %s""" + (" FOR UPDATE OF o" if cur else "")
-    sql_i = """SELECT id, parent_id, kind, name, qty, unit_price, status
+    sql_i = """SELECT id, parent_id, kind, name, qty, unit_price, status, station_id
                FROM order_items WHERE order_id = %s ORDER BY id"""
     if cur:
         cur.execute(sql_o, (order_id,)); o = cur.fetchone()
@@ -884,23 +1139,50 @@ def thungan():
     return render_template('thungan.html')
 
 
+CASHIER_DEFAULT_NAME = 'Phương'      # người thu ngân mặc định (chọn sẵn ở màn hình đăng nhập quầy)
+
+
+def default_cashier_id():
+    row = query("SELECT id FROM staffs WHERE is_active AND name LIKE %s ORDER BY id LIMIT 1",
+                (f"%{CASHIER_DEFAULT_NAME}%",), one=True)
+    return row['id'] if row else None
+
+
+@app.route('/api/cashier/staff')
+def api_cashier_staff():
+    """Danh sách nhân viên để chọn "ai đang thu ngân" ở màn hình đăng nhập quầy (không có PIN)."""
+    rows = query("SELECT id, name, role FROM staffs WHERE is_active ORDER BY id")
+    return jsonify({"staff": [dict(r) for r in rows], "default_id": default_cashier_id()})
+
+
 @app.route('/api/cashier/login', methods=['POST'])
 def api_cashier_login():
-    pw = str((request.get_json() or {}).get('password', '')).strip()
+    data = request.get_json() or {}
+    pw = str(data.get('password', '')).strip()
     if not check_pw('cashier', pw):
         return fail("Mật khẩu không đúng.", 401)
+
+    sid = str(data.get('staff_id') or '').strip() or default_cashier_id()
+    staff = query("SELECT id, name FROM staffs WHERE id = %s AND is_active", (sid,), one=True) if sid else None
+    if not staff:
+        return fail("Hãy chọn người thu ngân.")
     session['cashier'] = True
-    return jsonify({"success": True})
+    session['cashier_id'] = staff['id']          # ghi vào hoá đơn (orders.cashier_id) khi thanh toán
+    return jsonify({"success": True, "id": staff['id'], "name": staff['name']})
 
 
 @app.route('/api/cashier/me')
 def api_cashier_me():
-    return jsonify({"logged_in": bool(session.get('cashier'))})
+    if not session.get('cashier'):
+        return jsonify({"logged_in": False})
+    staff = query("SELECT id, name FROM staffs WHERE id = %s", (session.get('cashier_id'),), one=True)
+    return jsonify({"logged_in": True, "id": staff['id'] if staff else None, "name": staff['name'] if staff else None})
 
 
 @app.route('/api/cashier/logout', methods=['POST'])
 def api_cashier_logout():
     session.pop('cashier', None)
+    session.pop('cashier_id', None)
     return jsonify({"success": True})
 
 
@@ -933,7 +1215,7 @@ def api_cashier_bill(order_id):
         return fail("Số khách không hợp lệ.")
     if not 1 <= guests <= 60:
         return fail("Số khách phải từ 1 đến 60.")
-    b = compute_bill(o, items, guests, parse_promo(request.args.get('promo')))
+    b = compute_bill(o, items, guests, parse_promo(request.args.get('promo')), request.args.get('voucher') or None)
     b.update({"order_id": o['id'], "table_id": o['table_id'], "status": o['status'],
               "opened_at": o['opened_at'], "pending": pending_count(items)})
     # thông tin in trên phiếu: tầng, nhân viên phục vụ, giờ vào đầy đủ
@@ -976,7 +1258,13 @@ def api_cashier_pay(order_id):
             if not 1 <= guests <= 60:
                 raise OrderError("Số khách phải từ 1 đến 60.")
 
-            b = compute_bill(o, items, guests, parse_promo(data.get('promo')))
+            b = compute_bill(o, items, guests, parse_promo(data.get('promo')), data.get('voucher') or None)
+            if b['voucher_error']:
+                raise OrderError(b['voucher_error'])
+
+            # người đang thu ngân (chọn lúc đăng nhập quầy); phiên cũ chưa có thì để trống như trước
+            cur.execute("SELECT id FROM staffs WHERE id = %s", (session.get('cashier_id'),))
+            cashier = cur.fetchone()
 
             cur.execute("""
                 UPDATE orders SET status = 'CLOSED', closed_at = NOW(), paid_at = NOW(),
@@ -984,7 +1272,7 @@ def api_cashier_pay(order_id):
                        food_amount = %s, drink_amount = %s, extra_amount = %s,
                        discount = %s, vat_amount = %s, total = %s, promo_note = %s
                 WHERE id = %s
-            """, (guests, method, None, b['food_amount'], b['drink_amount'], b['extra_amount'],
+            """, (guests, method, cashier['id'] if cashier else None, b['food_amount'], b['drink_amount'], b['extra_amount'],
                   b['discount'], b['vat'], b['total'], b['promo_note'], order_id))
             cur.execute("UPDATE dining_tables SET status = 'AVAILABLE' WHERE id = %s", (o['table_id'],))
 
@@ -1561,13 +1849,15 @@ def api_manager_export():
     if kind == 'invoices':
         w.writerow(['Mã HĐ', 'Ngày giờ thanh toán', 'Bàn', 'Gói buffet', 'Số khách', 'Tiền buffet đồ ăn',
                     'Tiền buffet nước', 'Gọi lẻ / combo', 'Giảm giá', 'VAT', 'Tổng thanh toán',
-                    'Hình thức', 'Ưu đãi', 'Trạng thái', 'Lí do huỷ'])
+                    'Hình thức', 'Ưu đãi', 'Thu ngân', 'Trạng thái', 'Lí do huỷ'])
         rows = query("""
             SELECT o.id, to_char(o.paid_at, 'DD/MM/YYYY HH24:MI') AS paid, o.table_id,
                    COALESCE(pk.name, 'Chỉ gọi lẻ') AS package, o.guests, o.food_amount, o.drink_amount,
                    o.extra_amount, o.discount, o.vat_amount, o.total, o.payment_method, o.promo_note,
+                   COALESCE(cs.name, '') AS cashier,
                    (o.voided_at IS NOT NULL) AS voided, o.void_reason
             FROM orders o LEFT JOIN packages pk ON pk.id = o.package_id
+                          LEFT JOIN staffs cs ON cs.id = o.cashier_id
             WHERE o.status = 'CLOSED' AND o.paid_at IS NOT NULL AND o.paid_at::date BETWEEN %s AND %s
             ORDER BY o.paid_at""", p)
         methods = {'CASH': 'Tiền mặt', 'CARD': 'Thẻ', 'TRANSFER': 'Chuyển khoản'}
@@ -1575,7 +1865,7 @@ def api_manager_export():
             w.writerow([r['id'], r['paid'], r['table_id'], r['package'], r['guests'], r['food_amount'] or 0,
                         r['drink_amount'] or 0, r['extra_amount'] or 0, r['discount'] or 0, r['vat_amount'] or 0,
                         r['total'] or 0, methods.get(r['payment_method'], r['payment_method'] or ''),
-                        r['promo_note'] or '', 'Đã huỷ' if r['voided'] else 'Đã thanh toán', r['void_reason'] or ''])
+                        r['promo_note'] or '', r['cashier'], 'Đã huỷ' if r['voided'] else 'Đã thanh toán', r['void_reason'] or ''])
     elif kind == 'dishes':
         w.writerow(['Món', 'Nhóm', 'Loại', 'Số lượng', 'Doanh thu'])
         base = f"""FROM order_items oi JOIN orders o ON o.id = oi.order_id
@@ -1932,7 +2222,7 @@ def create_reservation(data, source):
         hhmm = datetime.strptime(str(data.get('time') or ''), '%H:%M').strftime('%H:%M')
     except ValueError:
         raise OrderError("Hãy chọn ngày và giờ đặt bàn.")
-    now = datetime.now()
+    now = vn_now()                        # ngày giờ khách chọn là giờ Việt Nam, không phụ thuộc múi giờ máy chủ
     if day < now.date():
         raise OrderError("Ngày đặt bàn không được ở quá khứ.")
     if day > now.date() + timedelta(days=RESERVE_MAX_DAYS):
@@ -2044,6 +2334,59 @@ def api_manager_reservation_status(rid):
             return fail("Không chuyển được sang trạng thái này.")
         cur.execute("UPDATE reservations SET status = %s, updated_at = NOW() WHERE id = %s", (new, rid))
     return jsonify({"success": True})
+
+
+# ---------- Phục vụ: khách đặt bàn đến nhận bàn ----------
+
+@app.route('/api/reservations/today')
+def api_reservations_today():
+    """Đơn đặt bàn HÔM NAY còn chờ khách đến (cho màn hình phục vụ). Cần ?staff=<mã nhân viên>.
+    minutes_late > 0: khách đã trễ ngần ấy phút; < 0: còn ngần ấy phút nữa mới tới giờ."""
+    if not query("SELECT 1 FROM staffs WHERE id = %s AND is_active", (request.args.get('staff') or '',), one=True):
+        return fail("Chưa đăng nhập nhân viên.", 401)
+    now = vn_now()
+    rows = query("""
+        SELECT r.id, r.customer_name, r.phone, r.guests, r.table_id, t.name AS table_name, t.floor, t.type,
+               t.capacity, t.min_capacity, to_char(r.reserve_time, 'HH24:MI') AS time, r.note, r.status,
+               EXISTS (SELECT 1 FROM orders o WHERE o.table_id = r.table_id AND o.status = 'OPEN') AS table_busy
+        FROM reservations r JOIN dining_tables t ON t.id = r.table_id
+        WHERE r.reserve_date = %s AND r.status IN ('PENDING', 'CONFIRMED')
+        ORDER BY r.reserve_time, r.id""", (now.date(),))
+    out = []
+    for r in rows:
+        d = dict(r)
+        hh, mm = d['time'].split(':')
+        due = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+        d['minutes_late'] = int((now - due).total_seconds() // 60)
+        out.append(d)
+    return jsonify({"success": True, "reservations": out})
+
+
+@app.route('/api/reservations/<int:rid>/seat', methods=['POST'])
+def api_reservation_seat(rid):
+    """Khách đặt bàn đã đến: mở bàn + đánh dấu 'Đã đến' trong cùng một lần (lỗi thì không đổi gì cả).
+    table_id (tuỳ chọn): nếu bàn đã đặt đang bận, cho khách ngồi bàn khác -> đơn đặt bàn được ghi lại bàn thật."""
+    data = request.get_json() or {}
+    try:
+        guests = parse_guests(data.get('guests'))
+        with transaction() as cur:
+            cur.execute("SELECT id, status, table_id, reserve_date FROM reservations WHERE id = %s FOR UPDATE", (rid,))
+            r = cur.fetchone()
+            if not r:
+                raise OrderError("Không tìm thấy đơn đặt bàn.")
+            if r['status'] not in ('PENDING', 'CONFIRMED'):
+                raise OrderError("Đơn đặt bàn này không còn ở trạng thái chờ khách (đã đến, đã huỷ hoặc khách không đến).")
+            if r['reserve_date'] != vn_now().date():
+                raise OrderError("Đơn đặt bàn này không phải của hôm nay.")
+
+            table_id = str(data.get('table_id') or r['table_id'])
+            order_id = open_order_tx(cur, table_id, data.get('staff_id'), guests,
+                                     data.get('package_id') or None, data.get('drink_package_id') or None)
+            cur.execute("UPDATE reservations SET status = 'ARRIVED', table_id = %s, updated_at = NOW() WHERE id = %s",
+                        (table_id, rid))
+    except OrderError as e:
+        return fail(str(e))
+    return jsonify({"success": True, "order": order_detail(order_id)})
 
 
 # ---------- Bàn ----------
@@ -2505,7 +2848,8 @@ def table_self_order(table_id):
     t = query("SELECT id, name FROM dining_tables WHERE id = %s AND is_active", (table_id.upper(),), one=True)
     if not t:
         return redirect(url_for('home'))
-    return render_template('goimon.html', table=dict(t))
+    # dùng goimon.html; nếu thư mục templates chỉ có bản đổi tên cũ goimon_ban.html thì dùng bản đó
+    return render_template(['goimon.html', 'goimon_ban.html'], table=dict(t))
 
 
 @app.route('/api/service-call/status')
