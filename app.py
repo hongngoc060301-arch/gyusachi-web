@@ -1,7 +1,9 @@
 import csv
 import io
+import os
 import re
 import time
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -11,7 +13,15 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from db import query, transaction
 
 app = Flask(__name__)
-app.secret_key = 'gyusachi-do-an-tot-nghiep'     # khoá để Flask nhớ đăng nhập thu ngân
+# Khoá bí mật để Flask ký cookie đăng nhập. Trên Render: Environment > thêm SECRET_KEY = một chuỗi dài ngẫu nhiên.
+# (Không đặt thì dùng khoá tạm bên dưới - chạy được nhưng kém an toàn.)
+app.secret_key = os.environ.get('SECRET_KEY') or 'gyusachi-do-an-tot-nghiep'
+app.config.update(
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=14),     # đăng nhập giữ trong 1 ca, không phải đăng nhập lại liên tục
+    SESSION_COOKIE_HTTPONLY=True,                       # JavaScript không đọc được cookie đăng nhập
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=bool(os.environ.get('RENDER')),   # trên Render (https) chỉ gửi cookie qua https
+)
 
 
 # =========================================================
@@ -55,6 +65,49 @@ def group_by_category(rows):
 
 
 VN_TZ = timezone(timedelta(hours=7))      # giờ Việt Nam (máy chủ Render chạy giờ UTC; VN không có giờ mùa hè)
+
+
+# ---- Chặn dò mã PIN: sai 5 lần liên tiếp thì khoá 5 phút (theo địa chỉ IP + loại đăng nhập) ----
+_FAILS = {}
+_FAILS_LOCK = threading.Lock()
+MAX_PIN_FAILS = 5
+PIN_LOCK_SECONDS = 300
+
+
+def _client_ip():
+    fwd = request.headers.get('X-Forwarded-For', '')          # Render đặt IP thật của khách ở đây
+    return (fwd.split(',')[0].strip() if fwd else request.remote_addr) or '?'
+
+
+def pin_locked(kind):
+    """Trả số giây còn bị khoá (0 = không khoá)."""
+    k = (kind, _client_ip())
+    with _FAILS_LOCK:
+        rec = _FAILS.get(k)
+        if rec and rec['until'] > time.time():
+            return int(rec['until'] - time.time()) + 1
+    return 0
+
+
+def pin_failed(kind):
+    k = (kind, _client_ip())
+    with _FAILS_LOCK:
+        rec = _FAILS.setdefault(k, {'n': 0, 'until': 0})
+        if rec['until'] and rec['until'] <= time.time():
+            rec['n'], rec['until'] = 0, 0                     # hết thời gian khoá -> đếm lại
+        rec['n'] += 1
+        if rec['n'] >= MAX_PIN_FAILS:
+            rec['until'] = time.time() + PIN_LOCK_SECONDS
+            rec['n'] = 0
+
+
+def pin_ok(kind):
+    with _FAILS_LOCK:
+        _FAILS.pop((kind, _client_ip()), None)
+
+
+def lock_message(secs):
+    return f"Nhập sai quá nhiều lần. Vui lòng thử lại sau {(secs + 59) // 60} phút."
 
 
 def vn_now():
@@ -168,6 +221,10 @@ def verify_pin():
     code = str(data.get('id', '')).strip()
     entered_pin = str(data.get('pin', '')).strip()
 
+    left = pin_locked('staff')
+    if left:
+        return jsonify({"success": False, "message": lock_message(left)}), 429
+
     try:
         staff = query(
             "SELECT id, name FROM staffs WHERE id = %s AND pin = %s AND is_active",
@@ -184,7 +241,14 @@ def verify_pin():
             "message": "Không kết nối được cơ sở dữ liệu!"
         })
 
+    if staff or station:
+        pin_ok('staff')
+    else:
+        pin_failed('staff')
+
     if staff:
+        session.permanent = True
+        session['staff'] = staff['id']              # nhớ nhân viên đã nhập đúng PIN (để phân biệt với khách quét QR)
         return jsonify({
             "success": True,
             "message": f"Chào mừng {staff['name']} vào ca!",
@@ -192,6 +256,8 @@ def verify_pin():
         })
 
     if station:
+        session.permanent = True
+        session['station'] = station['id']
         return jsonify({
             "success": True,
             "message": f"Chào mừng đến {station['name']}!",
@@ -261,8 +327,8 @@ def phucvu():
         (staff_id,), one=True
     )
 
-    if not staff:
-        return redirect(url_for('home'))
+    if not staff or session.get('staff') != staff['id']:
+        return redirect(url_for('home'))             # chưa nhập PIN (hoặc đổi sang ID khác) -> về trang đăng nhập
 
     return render_template(
         'phucvu.html',
@@ -319,7 +385,7 @@ def api_tables():
 @app.route('/api/packages')
 def api_packages():
     """Các gói buffet. today_ok = gói có áp dụng hôm nay không (49K: T2-T5, 69K: T6-CN)."""
-    today = datetime.now().isoweekday()          # 1 = thứ 2 ... 7 = chủ nhật
+    today = vn_now().isoweekday()          # 1 = thứ 2 ... 7 = chủ nhật
     food, drink = [], []
 
     for r in query("SELECT id, name, price, valid_days FROM packages WHERE is_active ORDER BY price"):
@@ -648,7 +714,7 @@ def api_change_package(order_id):
                     raise OrderError("Gói buffet nước không hợp lệ.")
                 if drink_id != order['drink_package_id']:
                     days = [int(x) for x in (p['valid_days'] or '').split(',') if x.strip()]
-                    if days and datetime.now().isoweekday() not in days:
+                    if days and vn_now().isoweekday() not in days:
                         raise OrderError("Gói nước này không áp dụng hôm nay.")
 
             # món buffet đã gọi mà gói mới không có -> chặn
@@ -677,15 +743,24 @@ def api_change_package(order_id):
     return jsonify({"success": True, "order": order_detail(order_id)})
 
 
+def is_customer_request(data):
+    """Người gọi là KHÁCH quét QR? Do SERVER quyết định, không tin cờ do trình duyệt gửi:
+    chỉ nhân viên đã nhập PIN (có session) mới được gọi như nhân viên. Khách giả mạo không gửi cờ 'QR' vẫn bị coi là khách."""
+    if data.get('source') == 'QR':
+        return True
+    return not (session.get('staff') or session.get('manager'))
+
+
 @app.route('/api/orders/<int:order_id>/items', methods=['POST'])
 def api_add_items(order_id):
     """Gửi món xuống bếp. Mỗi món: {type:'PACKAGE'|'ALACARTE', id, qty, choices:{partId: 'tên'}}"""
     data = request.get_json() or {}
     items = data.get('items') or []
+    customer = is_customer_request(data)
 
     if not items:
         return fail("Chưa chọn món nào.")
-    if data.get('source') == 'QR':
+    if customer:
         # Khách tự gọi: chỉ món trong buffet và nước lẻ (quầy bar ST01); món lẻ khác gọi nhân viên
         for it in items:
             if it.get('type') == 'PACKAGE':
@@ -711,7 +786,7 @@ def api_add_items(order_id):
             first_new = cur.fetchone()['m']
 
             # Khách tự gọi qua QR mà đã quá giờ buffet: chỉ còn gọi được tráng miệng (nhân viên vẫn gọi được bình thường)
-            if data.get('source') == 'QR' and package_ids:
+            if customer and package_ids:
                 cur.execute("""SELECT EXTRACT(EPOCH FROM (NOW() - MIN(created_at)))::int AS e
                                FROM order_items WHERE order_id = %s""", (order_id,))
                 e = cur.fetchone()['e']
@@ -804,7 +879,7 @@ def api_add_items(order_id):
                 else:
                     raise OrderError("Loại món không hợp lệ.")
 
-            if data.get('source') == 'QR':               # khách tự gọi qua mã QR ở bàn
+            if customer:                                 # khách tự gọi qua mã QR ở bàn
                 cur.execute("UPDATE order_items SET source = 'QR' WHERE order_id = %s AND id > %s", (order_id, first_new))
 
     except OrderError as e:
@@ -900,7 +975,7 @@ def api_kitchen_status(item_id):
 # =========================================================
 # Chỉnh các hằng số này khi nhà hàng đổi chính sách.
 
-CASHIER_PASSWORD = '1234'                                # mật khẩu quầy thu ngân
+CASHIER_PASSWORD = os.environ.get('CASHIER_PIN', '1234')                                # mật khẩu quầy thu ngân
 VAT_RATE = 0.08                                          # VAT 8%
 LUNCH_END_HOUR = 15                                      # mở bàn trước 15:00 là buffet trưa
 GROUP_SIZE = 4                                           # đi 4 ...
@@ -1159,13 +1234,19 @@ def api_cashier_staff():
 def api_cashier_login():
     data = request.get_json() or {}
     pw = str(data.get('password', '')).strip()
+    left = pin_locked('cashier')
+    if left:
+        return fail(lock_message(left), 429)
     if not check_pw('cashier', pw):
+        pin_failed('cashier')
         return fail("Mật khẩu không đúng.", 401)
+    pin_ok('cashier')
 
     sid = str(data.get('staff_id') or '').strip() or default_cashier_id()
     staff = query("SELECT id, name FROM staffs WHERE id = %s AND is_active", (sid,), one=True) if sid else None
     if not staff:
         return fail("Hãy chọn người thu ngân.")
+    session.permanent = True
     session['cashier'] = True
     session['cashier_id'] = staff['id']          # ghi vào hoá đơn (orders.cashier_id) khi thanh toán
     return jsonify({"success": True, "id": staff['id'], "name": staff['name']})
@@ -1305,7 +1386,7 @@ def api_cashier_history():
 # 8C. QUẢN LÍ — DASHBOARD, BÁO CÁO, THỐNG KÊ MÓN, THỰC ĐƠN
 # =========================================================
 
-MANAGER_PASSWORD = '88889999'                            # mật khẩu phân hệ quản lí
+MANAGER_PASSWORD = os.environ.get('MANAGER_PIN', '88889999')                            # mật khẩu phân hệ quản lí
 
 PAID = "o.status = 'CLOSED' AND o.paid_at IS NOT NULL AND o.voided_at IS NULL"   # hoá đơn đã thanh toán và chưa bị huỷ
 
@@ -1322,8 +1403,14 @@ def quanli():
 @app.route('/api/manager/login', methods=['POST'])
 def api_manager_login():
     pw = str((request.get_json() or {}).get('password', '')).strip()
+    left = pin_locked('manager')
+    if left:
+        return fail(lock_message(left), 429)
     if not check_pw('manager', pw):
+        pin_failed('manager')
         return fail("Mật khẩu không đúng.", 401)
+    pin_ok('manager')
+    session.permanent = True
     session['manager'] = True
     return jsonify({"success": True})
 
@@ -1339,6 +1426,17 @@ def api_manager_logout():
     return jsonify({"success": True})
 
 
+CASHIER_OPEN_PATHS = ('/api/cashier/staff', '/api/cashier/login', '/api/cashier/me', '/api/cashier/logout')
+
+
+@app.before_request
+def guard_cashier_api():
+    """Mọi API /api/cashier/* (trừ chọn người thu / đăng nhập / kiểm tra / đăng xuất) cần đã đăng nhập quầy thu ngân."""
+    if request.path.startswith('/api/cashier/') and request.path not in CASHIER_OPEN_PATHS:
+        if not session.get('cashier'):
+            return fail("Hết phiên đăng nhập, hãy đăng nhập lại quầy thu ngân.", 401)
+
+
 @app.before_request
 def guard_manager_api():
     """Mọi API /api/manager/* (trừ đăng nhập / kiểm tra / đăng xuất) cần đã nhập mật khẩu quản lí."""
@@ -1350,7 +1448,7 @@ def guard_manager_api():
 
 def date_range():
     """Đọc ?from=YYYY-MM-DD&to=YYYY-MM-DD (mặc định 7 ngày gần nhất). Trả (from, to) dạng chuỗi."""
-    today = datetime.now().date()
+    today = vn_now().date()
     try:
         d_to = datetime.strptime(request.args.get('to', ''), '%Y-%m-%d').date()
     except ValueError:
@@ -1399,7 +1497,7 @@ def api_manager_overview():
                         FROM orders WHERE status = 'OPEN'""", one=True)
     all_tables = query("SELECT COUNT(*)::int AS n FROM dining_tables WHERE is_active", one=True)['n']
 
-    today = datetime.now().date()
+    today = vn_now().date()
     series = daily_series((today - timedelta(days=13)).isoformat(), today.isoformat())
 
     top = query(f"""
@@ -2285,7 +2383,7 @@ def api_book_table():
 @app.route('/api/manager/reservations')
 def api_manager_reservations():
     """Danh sách đặt bàn. Tham số: date_from, date_to (YYYY-MM-DD), status (tuỳ chọn)."""
-    d_from = request.args.get('date_from') or str(datetime.now().date())
+    d_from = request.args.get('date_from') or str(vn_now().date())
     d_to = request.args.get('date_to') or d_from
     status = request.args.get('status') or None
     try:
@@ -2808,7 +2906,7 @@ def api_manager_pv_move(ma_vt):
 def api_manager_pv_day():
     """Thông tin chốt ngày: số khách đã lưu, số khách gợi ý (từ hoá đơn đã thanh toán), ngày đó đã chốt chưa."""
     try:
-        day = parse_day(request.args.get('date') or datetime.now().date().isoformat())
+        day = parse_day(request.args.get('date') or vn_now().date().isoformat())
     except OrderError as e:
         return fail(str(e))
     saved = query("SELECT so_khach FROM so_khach_ngay WHERE ngay = %s", (day,), one=True)
@@ -2825,7 +2923,7 @@ def api_manager_pv_chot():
     data = request.get_json() or {}
     try:
         day = parse_day(data.get('date'))
-        if day > datetime.now().date():
+        if day > vn_now().date():
             raise OrderError("Chưa chốt được ngày trong tương lai.")
         khach = int(num(data.get('so_khach'), "Số khách", minimum=0, maximum=100000))
         with transaction() as cur:

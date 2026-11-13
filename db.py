@@ -10,8 +10,11 @@ DB_CONFIG = {
     "port": 5432,
     "dbname": "gyusachi",
     "user": "postgres",
-    "password": "Ngoc010306"
+    "password": os.environ.get("DB_PASSWORD", "Ngoc010306")   # đặt biến môi trường DB_PASSWORD (PyCharm: Run > Edit Configurations > Environment variables)
 }
+
+# Mọi kết nối chạy theo giờ Việt Nam: NOW(), CURRENT_DATE, to_char(...) đều ra giờ VN dù máy chủ Render chạy UTC
+PG_OPTIONS = "-c timezone=Asia/Ho_Chi_Minh"
 
 # Biến môi trường từ Render (khi đưa lên web)
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -19,8 +22,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_conn():
     if DATABASE_URL:
-        return psycopg2.connect(DATABASE_URL)
-    return psycopg2.connect(**DB_CONFIG)
+        return psycopg2.connect(DATABASE_URL, options=PG_OPTIONS)
+    return psycopg2.connect(options=PG_OPTIONS, **DB_CONFIG)
 
 
 def query(sql, params=None, one=False):
