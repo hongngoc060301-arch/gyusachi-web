@@ -41,6 +41,7 @@
 
   <!-- thực đơn -->
   <section id="menuView" class="hidden">
+    <div id="timeBar" class="hidden"></div>
     <div id="menuTabs" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
     <div class="relative mt-3">
       <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
@@ -48,10 +49,13 @@
         class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-red-500 outline-none text-sm">
     </div>
     <div id="catChips" class="flex gap-2 overflow-x-auto no-scrollbar mt-3"></div>
-    <p class="text-[11px] text-slate-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i>Món ngoài thực đơn này (gọi lẻ, combo...) vui lòng bấm <b>Gọi nhân viên</b>. Nước lẻ có giá riêng, tính thêm vào hoá đơn.</p>
+    <p id="hintNote" class="text-[11px] text-slate-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i>Món ngoài thực đơn này (gọi lẻ, combo...) vui lòng bấm <b>Gọi nhân viên</b>. Nước lẻ có giá riêng, tính thêm vào hoá đơn.</p>
     <div id="menuGrid" class="grid grid-cols-2 gap-3 mt-4"></div>
 
-    <h3 class="mt-8 text-xs font-bold text-slate-400 uppercase tracking-widest">Món đã gọi</h3>
+    <!-- tạm tính + số món đã gọi -->
+    <div id="sumCard" class="hidden mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-4"></div>
+
+    <h3 class="mt-6 text-xs font-bold text-slate-400 uppercase tracking-widest">Món đã gọi</h3>
     <div id="sentList" class="mt-3 space-y-2"></div>
   </section>
 </main>
@@ -105,6 +109,7 @@
   const TABLE_ID = "{{ table.id }}";
   let ORDER = null, CART = [], MENU = {}, ITEM_INDEX = {};
   let tab = 'food', cat = 'ALL', search = '', pendingChoice = null, OPEN_CALLS = [];
+  let END_TS = null, WAS_EXPIRED = false;      // giờ hết hạn gọi món buffet (null = chưa tính giờ / không có buffet)
 
   const STATUS_TEXT = { NEW: 'Chờ bếp', DOING: 'Đang làm', DONE: 'Đã xong', CANCELLED: 'Đã huỷ' };
   const STATUS_CLASS = {
@@ -131,6 +136,62 @@
   }
 
 
+  // ============ ĐỒNG HỒ GỌI MÓN BUFFET (120 phút tính từ món đầu tiên) ============
+  const WARN_SEC = 15 * 60;                 // báo "sắp hết giờ" khi còn 15 phút (khớp BUFFET_WARN_MINUTES ở app.py)
+  const pad2 = n => String(n).padStart(2, '0');
+  function fmtLeft(s) {
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    return (h ? h + ':' + pad2(m) : m) + ':' + pad2(x);
+  }
+  // Lấy giờ hết hạn từ số giây còn lại do máy chủ tính (poll 5s/lần nên đồng hồ luôn được chỉnh lại theo máy chủ)
+  function syncEnd() {
+    END_TS = (ORDER && ORDER.seconds_left != null) ? Date.now() + ORDER.seconds_left * 1000 : null;
+  }
+  function expired() { return END_TS !== null && Date.now() >= END_TS; }
+  function isDessert(c) { return c.type === 'PACKAGE' && c.category === 'Tráng miệng'; }
+
+  function tickTimer() {
+    const bar = document.getElementById('timeBar');
+    const note = document.getElementById('hintNote');
+    if (!ORDER || !(ORDER.package_id || ORDER.drink_package_id)) {     // không có buffet -> không tính giờ
+      bar.classList.add('hidden');
+      if (note) note.classList.remove('hidden');
+      return;
+    }
+    const mins = ORDER.limit_min || 120;
+    const base = 'mt-3 px-4 py-2.5 rounded-xl text-sm font-bold border ';
+    const ex = expired();
+
+    if (ex !== WAS_EXPIRED) {               // vừa chuyển sang / ra khỏi trạng thái hết giờ
+      WAS_EXPIRED = ex;
+      if (ex) {
+        CART = CART.filter(isDessert);      // bỏ khỏi giỏ những món không còn được gọi
+        toast('Đã hết ' + mins + ' phút gọi món. Bạn chỉ còn gọi thêm được tráng miệng.', false);
+      }
+      renderTabs(); renderCart(); loadAndRenderMenu();
+    }
+    if (note) note.classList.toggle('hidden', ex);
+
+    if (END_TS === null) {
+      bar.className = base + 'bg-slate-900 border-slate-700 text-slate-300';
+      bar.innerHTML = '<i class="fa-regular fa-clock mr-2"></i>Bạn có <b>' + mins + ' phút</b> gọi món, tính từ món đầu tiên.';
+      return;
+    }
+    const left = Math.round((END_TS - Date.now()) / 1000);
+    if (left <= 0) {
+      bar.className = base + 'bg-red-950/70 border-red-700 text-red-200';
+      bar.innerHTML = '<i class="fa-solid fa-hourglass-end mr-2"></i>Đã hết ' + mins + ' phút gọi món. Bạn chỉ còn gọi thêm được <b>tráng miệng</b>. '
+                    + 'Cần gì khác, hãy bấm <b>Gọi nhân viên</b> hoặc <b>Xin tính tiền</b>.';
+    } else if (left <= WARN_SEC) {
+      bar.className = base + 'bg-amber-950/70 border-amber-600 text-amber-200 animate-pulse';
+      bar.innerHTML = '<i class="fa-solid fa-hourglass-half mr-2"></i>Sắp hết giờ gọi món, còn <b>' + fmtLeft(left) + '</b>. Hãy gọi thêm món bạn muốn nhé!';
+    } else {
+      bar.className = base + 'bg-emerald-950/50 border-emerald-700/60 text-emerald-200';
+      bar.innerHTML = '<i class="fa-regular fa-clock mr-2"></i>Còn <b>' + fmtLeft(left) + '</b> để gọi món';
+    }
+  }
+
+
   // ============ TẢI ĐƠN CỦA BÀN ============
   async function loadOrder(first) {
     const [r, c] = await Promise.all([api('/api/orders/by-table/' + encodeURIComponent(TABLE_ID)),
@@ -139,6 +200,7 @@
     renderCalls();
     const was = ORDER;
     ORDER = r.order || null;
+    syncEnd();
     if (!ORDER) {
       CART = [];
       document.getElementById('closedView').classList.remove('hidden');
@@ -156,6 +218,8 @@
       renderChips(); renderTabs(); loadAndRenderMenu();
     }
     renderSent();
+    tickTimer();
+    loadSummary();
   }
 
   function renderChips() {
@@ -190,6 +254,10 @@
     if (ORDER.package_id)       t.push(['food',  'fa-utensils', 'Buffet đồ ăn']);
     if (ORDER.drink_package_id) t.push(['drink', 'fa-martini-glass-citrus', 'Buffet nước']);
     else t.push(['alacarte', 'fa-martini-glass-citrus', 'Nước lẻ']);
+    if (expired()) {                       // hết giờ: chỉ còn mục tráng miệng (thuộc buffet đồ ăn)
+      t.length = 0;
+      if (ORDER.package_id) { tab = 'food'; t.push(['food', 'fa-ice-cream', 'Tráng miệng']); }
+    }
     document.getElementById('menuTabs').innerHTML = t.map(x => `
       <button data-t="${x[0]}" onclick="setTab(this.dataset.t)"
         class="chip ${tab === x[0] ? 'active' : ''} shrink-0 px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 text-sm font-bold hover:border-red-500 transition">
@@ -232,7 +300,8 @@
 
   function renderMenu() {
     const [key] = menuKey();
-    const cats = MENU[key] || [];
+    let cats = MENU[key] || [];
+    if (expired()) cats = cats.filter(g => g.name === 'Tráng miệng');
     const type = tab === 'alacarte' ? 'ALACARTE' : 'PACKAGE';
     document.getElementById('catChips').innerHTML = [['ALL', 'Tất cả']].concat(cats.map(g => [g.name, g.name])).map(c => `
       <button data-cat="${esc(c[0])}" onclick="setCat(this.dataset.cat)"
@@ -245,7 +314,7 @@
       if (!items.length) return;
       html.push(`<h5 class="col-span-full text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">${esc(g.name)}</h5>`);
       items.forEach(i => {
-        ITEM_INDEX[type + ':' + i.id] = Object.assign({ type }, i);
+        ITEM_INDEX[type + ':' + i.id] = Object.assign({ type, category: g.name }, i);
         const q = cartQtyOf(type, i.id);
         html.push(`
           <button onclick="addToCart('${type}', ${i.id})"
@@ -258,7 +327,9 @@
       });
     });
     document.getElementById('menuGrid').innerHTML = html.length ? html.join('') :
-      '<p class="col-span-full text-center text-slate-500 text-sm mt-10">Không tìm thấy món nào.</p>';
+      (expired()
+        ? '<p class="col-span-full text-center text-slate-400 text-sm mt-10">Đã hết giờ gọi món. Cần thêm gì, bạn hãy bấm <b>Gọi nhân viên</b> hoặc <b>Xin tính tiền</b> nhé.</p>'
+        : '<p class="col-span-full text-center text-slate-500 text-sm mt-10">Không tìm thấy món nào.</p>');
   }
 
 
@@ -266,6 +337,7 @@
   function cartKey(type, id, choices) { return type + ':' + id + ':' + JSON.stringify(choices || {}); }
   function addToCart(type, id) {
     const item = ITEM_INDEX[type + ':' + id]; if (!item) return;
+    if (expired() && !isDessert(item)) { toast('Đã hết giờ gọi món. Bạn chỉ còn gọi được tráng miệng.', false); return; }
     if (item.is_combo && item.parts.some(p => p.choices)) { pendingChoice = { item, picked: {} }; openChoice(); return; }
     pushCart(item, {});
   }
@@ -273,7 +345,7 @@
     const key = cartKey(item.type, item.id, choices);
     const line = CART.find(c => c.key === key);
     if (line) line.qty = Math.min(99, line.qty + 1);
-    else CART.push({ key, type: item.type, id: item.id, name: item.name, price: item.price, qty: 1, choices,
+    else CART.push({ key, type: item.type, category: item.category, id: item.id, name: item.name, price: item.price, qty: 1, choices, note: '',
       choiceText: item.is_combo ? item.parts.filter(p => p.choices).map(p => choices[p.id]).join(', ') : '' });
     renderCart(); renderMenu();
   }
@@ -283,12 +355,36 @@
     if (line.qty <= 0) CART = CART.filter(c => c.key !== key);
     renderCart(); renderMenu();
   }
+  // ---- ghi chú cho bếp (mỗi dòng trong giỏ có 1 ô ghi chú + vài gợi ý bấm nhanh) ----
+  const NOTE_CHIPS = ['Không cay', 'Ít cay', 'Chín kỹ', 'Tái vừa', 'Không hành'];
+  function noteBox(c) {
+    return `<div class="mt-2">
+      <input data-note-key="${esc(c.key)}" value="${esc(c.note || '')}" maxlength="200" autocomplete="off"
+        oninput="setNote(this.dataset.noteKey, this.value)" placeholder="Ghi chú cho bếp (vd: không cay, nướng chín kỹ)"
+        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 focus:border-amber-500 outline-none text-xs">
+      <div class="flex flex-wrap gap-1.5 mt-1.5">${NOTE_CHIPS.map(t =>
+        `<button type="button" data-key="${esc(c.key)}" data-text="${esc(t)}" onclick="addNoteChip(this.dataset.key, this.dataset.text)"
+           class="px-2 py-1 rounded-full bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-[10px] font-bold transition">${esc(t)}</button>`).join('')}</div>
+    </div>`;
+  }
+  function setNote(key, v) { const l = CART.find(c => c.key === key); if (l) l.note = String(v).slice(0, 200); }
+  function addNoteChip(key, text) {
+    const l = CART.find(c => c.key === key); if (!l) return;
+    const parts = (l.note || '').split(',').map(s => s.trim()).filter(Boolean);
+    const i = parts.indexOf(text);
+    if (i >= 0) parts.splice(i, 1); else parts.push(text);          // bấm lần nữa để bỏ
+    l.note = parts.join(', ').slice(0, 200);
+    const inp = [...document.querySelectorAll('#cartList input[data-note-key]')].find(x => x.dataset.noteKey === key);
+    if (inp) inp.value = l.note;
+  }
+
   function renderCart() {
     const count = CART.reduce((s, c) => s + c.qty, 0);
     document.getElementById('cartCount').textContent = count;
     document.getElementById('cartBar').classList.toggle('hidden', !count);
     document.getElementById('cartList').innerHTML = CART.length ? CART.map(c => `
-      <div class="rounded-xl bg-slate-950 border border-slate-800 p-3 flex justify-between gap-2">
+      <div class="rounded-xl bg-slate-950 border border-slate-800 p-3">
+       <div class="flex justify-between gap-2">
         <div class="min-w-0"><div class="font-bold text-sm">${esc(c.name)}</div>
           ${c.choiceText ? `<div class="text-[11px] text-amber-300">${esc(c.choiceText)}</div>` : ''}
           ${c.price !== undefined ? `<div class="text-[11px] text-slate-400">${money(c.price)}</div>` : ''}</div>
@@ -296,7 +392,9 @@
           <button data-key="${esc(c.key)}" onclick="changeQty(this.dataset.key, -1)" class="w-8 h-8 rounded-lg bg-slate-800 font-black">−</button>
           <span class="w-6 text-center font-black">${c.qty}</span>
           <button data-key="${esc(c.key)}" onclick="changeQty(this.dataset.key, 1)" class="w-8 h-8 rounded-lg bg-slate-800 font-black">+</button>
-        </div></div>`).join('') : '<p class="text-sm text-slate-500">Chưa chọn món nào.</p>';
+        </div></div>
+        ${noteBox(c)}
+      </div>`).join('') : '<p class="text-sm text-slate-500">Chưa chọn món nào.</p>';
     const total = CART.filter(c => c.price !== undefined).reduce((s, c) => s + c.price * c.qty, 0);
     document.getElementById('cartTotal').innerHTML = `<span>${count} phần</span><span>${total ? 'Gọi lẻ: <b class="text-amber-400">' + money(total) + '</b>' : ''}</span>`;
     document.getElementById('sendBtn').disabled = !CART.length;
@@ -334,10 +432,10 @@
     if (!CART.length || !ORDER) return;
     const btn = document.getElementById('sendBtn'); btn.disabled = true;
     const r = await api('/api/orders/' + ORDER.id + '/items', {
-      source: 'QR', items: CART.map(c => ({ type: c.type, id: c.id, qty: c.qty, choices: c.choices })) });
+      source: 'QR', items: CART.map(c => ({ type: c.type, id: c.id, qty: c.qty, choices: c.choices, note: (c.note || '').trim() })) });
     if (!r.success) { toast(r.message, false); btn.disabled = false; return; }
-    CART = []; ORDER = r.order;
-    closeCart(); renderCart(); renderMenu(); renderSent();
+    CART = []; ORDER = r.order; syncEnd();          // món đầu tiên vừa gửi -> bắt đầu đếm giờ
+    closeCart(); renderCart(); renderMenu(); renderSent(); tickTimer(); loadSummary();
     toast('Đã gửi món xuống bếp. Bạn chờ một chút nhé!', true);
   }
 
@@ -360,7 +458,8 @@
       return `<div class="rounded-xl bg-slate-900 border border-slate-800 p-3 ${st === 'CANCELLED' ? 'opacity-50' : ''}">
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0"><div class="text-sm font-bold ${st === 'CANCELLED' ? 'line-through text-slate-500' : ''}">${esc(i.name)} <span class="text-amber-400">×${i.qty}</span></div>
-            <div class="text-[11px] text-slate-500">${esc(i.time)}${i.unit_price ? ' · ' + money(i.unit_price * i.qty) : ''}</div></div>
+            <div class="text-[11px] text-slate-500">${esc(i.time)}${i.unit_price ? ' · ' + money(i.unit_price * i.qty) : ''}</div>
+            ${i.note ? `<div class="text-[11px] text-amber-300 mt-0.5"><i class="fa-regular fa-note-sticky mr-1"></i>${esc(i.note)}</div>` : ''}</div>
           <span class="shrink-0 px-2 py-0.5 rounded-full border text-[10px] font-bold ${STATUS_CLASS[st]}">${STATUS_TEXT[st]}</span>
         </div>
         ${st === 'NEW' && i.source === 'QR' ? `<button onclick="cancelItem(${i.id})" class="mt-2 text-[11px] text-slate-500 hover:text-red-400 underline">Huỷ món</button>` : ''}
@@ -371,12 +470,48 @@
     if (!confirm('Huỷ món này?')) return;
     const r = await api('/api/order-items/' + id + '/cancel', {});
     if (!r.success) { toast(r.message, false); return; }
-    ORDER = r.order; renderSent(); toast('Đã huỷ món', true);
+    ORDER = r.order; syncEnd(); renderSent(); tickTimer(); loadSummary(); toast('Đã huỷ món', true);
+  }
+
+
+  // ============ TẠM TÍNH + SỐ MÓN ĐÃ GỌI ============
+  let SUMMARY = null;
+  async function loadSummary() {
+    const r = await api('/api/table/' + encodeURIComponent(TABLE_ID) + '/summary');
+    SUMMARY = r.success ? r.summary : null;
+    renderSummary();
+  }
+  function renderSummary() {
+    const box = document.getElementById('sumCard');
+    const s = SUMMARY;
+    if (!s || !ORDER) { box.classList.add('hidden'); return; }
+    const row = (label, val, cls) => `<div class="flex justify-between gap-3 ${cls || ''}"><span>${label}</span><span class="shrink-0">${val}</span></div>`;
+    const rows = [];
+    if (s.food_price) rows.push(row(esc(s.food_name) + ' × ' + s.guests + ' khách', money(s.food_amount)));
+    if (s.drink_price) rows.push(row(esc(s.drink_name) + ' × ' + s.guests + ' khách', money(s.drink_amount)));
+    s.lines.forEach(l => rows.push(row(esc(l.name) + ' × ' + l.qty, money(l.amount))));
+    if (s.discount) rows.push(row('Ưu đãi nhóm (miễn ' + s.promo_free + ' suất)', '− ' + money(s.discount), 'text-emerald-300'));
+    rows.push(row('Thuế VAT', money(s.vat)));
+    box.innerHTML = `
+      <div class="flex items-center justify-between gap-3">
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Tạm tính</span>
+        <span class="text-2xl font-black text-amber-400">${money(s.total)}</span>
+      </div>
+      <div class="text-[12px] text-slate-300 mt-2">Đã gọi <b>${s.dishes}</b> phần
+        · đã ra <b class="text-emerald-300">${s.served}</b>
+        · đang chờ <b class="text-amber-300">${s.waiting}</b></div>
+      <details class="mt-2">
+        <summary class="text-[11px] text-slate-400 cursor-pointer select-none">Xem chi tiết</summary>
+        <div class="mt-2 space-y-1 text-[12px] text-slate-300 border-t border-slate-800 pt-2">${rows.join('')}</div>
+      </details>
+      <p class="text-[10px] text-slate-500 mt-2">Số tiền tạm tính đã gồm VAT, chỉ để tham khảo. Thu ngân sẽ chốt lại khi thanh toán.</p>`;
+    box.classList.remove('hidden');
   }
 
 
   loadOrder(true);
   setInterval(loadOrder, 5000);
+  setInterval(tickTimer, 1000);
 </script>
 </body>
 </html>

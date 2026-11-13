@@ -54,8 +54,14 @@
         class="side-btn shrink-0 whitespace-nowrap md:w-full text-left px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm text-slate-300 hover:bg-slate-800 transition">
         <i class="fa-solid fa-building mr-2"></i>TẦNG 2
       </button>
+      <button id="side-res" onclick="openResPanel()"
+        class="shrink-0 whitespace-nowrap md:w-full text-left px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm text-sky-300 bg-sky-500/10 border border-sky-500/30 hover:bg-sky-500 hover:text-slate-950 transition">
+        <i class="fa-regular fa-calendar-check mr-2"></i>ĐẶT BÀN HÔM NAY
+        <span id="resBadge" class="hidden ml-1 px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-black"></span>
+      </button>
 
       <div class="hidden md:block pt-4 px-2 space-y-2 text-[11px] text-slate-400">
+        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded border-2 border-sky-600 bg-slate-900"></span>Bàn có khách đặt trước</div>
         <div class="flex items-center gap-2"><span class="w-3 h-3 rounded border-2 border-slate-600 bg-slate-900"></span>Bàn trống</div>
         <div class="flex items-center gap-2"><span class="w-3 h-3 rounded border-2 border-red-500 bg-red-950"></span>Đang có khách</div>
       </div>
@@ -96,6 +102,14 @@
       class="hidden px-3 md:px-4 py-2.5 rounded-xl bg-sky-500/15 border border-sky-500/40 text-sky-300 hover:bg-sky-500 hover:text-slate-950 font-bold text-sm transition">
       <i class="fa-solid fa-qrcode md:mr-2"></i><span class="hidden md:inline">HIỆN QR</span>
     </button>
+    <button id="moveBtn" onclick="showTblModal('move')"
+      class="hidden px-3 md:px-4 py-2.5 rounded-xl bg-violet-500/15 border border-violet-500/40 text-violet-300 hover:bg-violet-500 hover:text-slate-950 font-bold text-sm transition">
+      <i class="fa-solid fa-right-left md:mr-2"></i><span class="hidden md:inline">CHUYỂN BÀN</span>
+    </button>
+    <button id="mergeBtn" onclick="showTblModal('merge')"
+      class="hidden px-3 md:px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 font-bold text-sm transition">
+      <i class="fa-solid fa-object-group md:mr-2"></i><span class="hidden md:inline">GỘP BÀN</span>
+    </button>
     <button id="changeBtn" onclick="showChangeModal()"
       class="hidden px-3 md:px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-bold text-sm transition">
       <i class="fa-solid fa-ticket md:mr-2"></i><span class="hidden md:inline">ĐỔI VÉ</span>
@@ -109,6 +123,9 @@
   <!-- ===== A. FORM MỞ BÀN (bàn chưa có khách) ===== -->
   <section id="openForm" class="hidden flex-1 overflow-y-auto p-4 md:p-6">
     <div class="max-w-3xl mx-auto space-y-8">
+
+      <!-- Khách đã đặt bàn này trước (hiện khi bàn có đơn đặt hôm nay) -->
+      <div id="resBanner" class="hidden"></div>
 
       <div>
         <h4 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">1. Số khách</h4>
@@ -210,6 +227,32 @@
   </div>
 </div>
 
+<!-- ================= ĐẶT BÀN HÔM NAY (khách đến thì bấm "KHÁCH ĐÃ ĐẾN") ================= -->
+<div id="resModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onclick="if(event.target===this) closeResPanel()">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-5 md:p-6 max-h-[90vh] flex flex-col">
+    <div class="flex items-center justify-between gap-3">
+      <h4 class="text-lg font-black text-white"><i class="fa-regular fa-calendar-check mr-2 text-sky-400"></i>Đặt bàn hôm nay</h4>
+      <button onclick="closeResPanel()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-red-600 text-sm font-bold"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-slate-400 mt-1">Khách đến thì bấm <b>KHÁCH ĐÃ ĐẾN</b>: hệ thống tự điền số khách, bạn chỉ cần chọn vé buffet rồi mở bàn.</p>
+    <div id="resList" class="mt-4 space-y-3 overflow-y-auto"></div>
+  </div>
+</div>
+
+<!-- ================= CHUYỂN BÀN / GỘP BÀN ================= -->
+<div id="tblModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+    <h4 id="tblTitle" class="text-lg font-black text-white"></h4>
+    <p id="tblDesc" class="text-xs text-slate-400 mt-1"></p>
+    <div id="tblList" class="mt-4 space-y-5"></div>
+    <div id="tblError" class="hidden text-sm text-red-400 mt-4"></div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeTblModal()" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm">HUỶ</button>
+      <button onclick="submitTbl()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm">XÁC NHẬN</button>
+    </div>
+  </div>
+</div>
+
 <!-- ================= HỘP ĐỔI VÉ BUFFET ================= -->
 <div id="changeModal" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4">
   <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
@@ -265,8 +308,12 @@
   let MENU = {};              // bộ nhớ đệm thực đơn
   let ITEM_INDEX = {};        // 'type:id' -> món
   let tab = 'food', cat = 'ALL', search = '';
-  let openForm = { guests: 2, food: null, drink: null };
+  let openForm = { guests: 2, food: null, drink: null, res: null };   // res: đơn đặt bàn đang được nhận bàn
   let pendingChoice = null;   // combo đang chờ chọn món
+  let RES = [];               // đơn đặt bàn hôm nay (chưa đến)
+  let PRE_RES = null;         // đơn đặt bàn được chọn từ danh sách, chờ điền vào form mở bàn
+  let RES_PICK = null;        // đơn đặt bàn đang chọn "bàn khác" (khi bàn đã đặt đang bận)
+  let tblMode = null, tblPick = null;   // hộp Chuyển bàn / Gộp bàn
 
   const STATUS_TEXT = { NEW: 'Chờ bếp', DOING: 'Đang làm', DONE: 'Đã xong', CANCELLED: 'Đã huỷ' };
   const STATUS_CLASS = {
@@ -340,11 +387,22 @@
 
         const style = busy
           ? 'border-red-500 bg-red-950/50'
-          : 'border-slate-700 bg-slate-900 hover:border-red-500';
+          : (t.res_time ? 'border-sky-600 bg-slate-900 hover:border-sky-400' : 'border-slate-700 bg-slate-900 hover:border-red-500');
+
+        // bàn trống nhưng có khách đặt trước hôm nay
+        const rv = (!busy && t.res_time)
+          ? `<div class="text-[11px] mt-1 font-bold text-sky-300"><i class="fa-regular fa-calendar-check mr-1"></i>Đặt ${esc(t.res_time)} · ${t.res_guests} khách</div>`
+          : '';
 
         const sub = busy
           ? `<span class="text-red-300 font-bold">ĐANG DÙNG${t.guests ? ' · ' + t.guests + ' khách' : ''}</span>`
           : (isVip ? 'VIP' : t.capacity + ' chỗ');
+
+        // Đồng hồ 120 phút gọi món (chỉ bàn có buffet, tính từ món đầu tiên)
+        const tm = (busy && t.has_buffet)
+          ? (t.end_ts ? `<div class="tm text-[11px] mt-1 font-bold" data-end="${t.end_ts}"></div>`
+                      : '<div class="text-[11px] mt-1 text-slate-500">Chưa tính giờ</div>')
+          : '';
 
         return `
           <button onclick="openTable('${esc(t.id)}')"
@@ -353,6 +411,7 @@
               ${isVip ? '<i class="fa-solid fa-crown text-amber-400 text-base mr-1"></i>' : ''}${esc(t.id)}
             </div>
             <div class="text-xs mt-1 text-slate-400">${sub}</div>
+            ${rv}${tm}
           </button>`;
       }).join('');
 
@@ -364,14 +423,60 @@
           <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4">${cards}</div>
         </section>`;
     }).join('');
+    tickTimers();
   }
 
   async function refreshTables() {
     const r = await api('/api/tables');
     if (r.tables) {
-      TABLES = r.tables;
+      if (r.limit_sec) LIMIT_SEC = r.limit_sec;
+      if (r.warn_sec) WARN_SEC = r.warn_sec;
+      const now = Date.now();
+      TABLES = r.tables.map(t => Object.assign(t, {
+        end_ts: (t.has_buffet && t.elapsed_sec != null) ? now + (LIMIT_SEC - t.elapsed_sec) * 1000 : null
+      }));
       renderTables();
     }
+  }
+
+
+  // ============ ĐỒNG HỒ GỌI MÓN BUFFET (120 phút từ món đầu tiên) ============
+  let LIMIT_SEC = 7200, WARN_SEC = 900;
+  const TM_COLORS = ['text-emerald-300', 'text-amber-300', 'text-red-400', 'animate-pulse', 'font-black'];
+  const TM_STATE = {};                      // bàn -> 0 còn nhiều, 1 sắp hết, 2 hết giờ (để chỉ báo 1 lần khi chuyển mức)
+  const pad2 = n => String(n).padStart(2, '0');
+
+  function fmtLeft(s) {
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    return (h ? h + ':' + pad2(m) : m) + ':' + pad2(x);
+  }
+
+  function tickTimers() {
+    const now = Date.now();
+
+    document.querySelectorAll('.tm[data-end]').forEach(function(el) {
+      const left = Math.round((Number(el.dataset.end) - now) / 1000);
+      let cls, txt;
+      if (left <= 0)              { cls = 'text-red-400 font-black';                   txt = 'HẾT GIỜ GỌI MÓN'; }
+      else if (left <= WARN_SEC)  { cls = 'text-amber-300 font-black animate-pulse';   txt = 'Còn ' + fmtLeft(left); }
+      else                        { cls = 'text-emerald-300';                          txt = 'Còn ' + fmtLeft(left); }
+      el.classList.remove(...TM_COLORS);
+      el.classList.add(...cls.split(' '));
+      el.innerHTML = '<i class="fa-regular fa-clock mr-1"></i>' + txt;
+    });
+
+    // báo khi bàn chuyển sang "sắp hết giờ" / "hết giờ" (lần đầu mở trang chỉ ghi nhận, không báo)
+    TABLES.forEach(function(t) {
+      if (!t.end_ts) { delete TM_STATE[t.id]; return; }
+      const left = Math.round((t.end_ts - now) / 1000);
+      const st = left <= 0 ? 2 : (left <= WARN_SEC ? 1 : 0);
+      const prev = TM_STATE[t.id];
+      TM_STATE[t.id] = st;
+      if (prev === undefined || st <= prev) return;
+      beep();
+      toast(st === 2 ? 'Bàn ' + t.id + ' đã hết ' + Math.round(LIMIT_SEC / 60) + ' phút gọi món'
+                     : 'Bàn ' + t.id + ' sắp hết giờ gọi món (còn ' + Math.max(1, Math.round(left / 60)) + ' phút)', false);
+    });
   }
 
 
@@ -393,10 +498,13 @@
     document.getElementById('orderView').classList.add('hidden');
     document.getElementById('changeBtn').classList.add('hidden');
     document.getElementById('qrBtn').classList.add('hidden');
+    document.getElementById('moveBtn').classList.add('hidden');
+    document.getElementById('mergeBtn').classList.add('hidden');
 
     const r = await api('/api/orders/by-table/' + encodeURIComponent(id));
 
     if (r.order) {
+      PRE_RES = null;
       ORDER = r.order;
       showOrderView();
     } else {
@@ -425,13 +533,61 @@
     openForm = {
       guests: CUR_TABLE.type === 'VIP' ? (CUR_TABLE.min_capacity || 8) : Math.min(2, CUR_TABLE.capacity),
       food: null,
-      drink: null
+      drink: null,
+      res: null
     };
+
+    // khách đã đặt bàn: lấy danh sách mới nhất; nếu vào từ danh sách "Đặt bàn hôm nay" thì chọn sẵn đơn đó
+    await loadReservations();
+    if (PRE_RES) {
+      const pre = RES.find(x => x.id === PRE_RES);
+      PRE_RES = null;
+      if (pre) { openForm.res = pre; openForm.guests = pre.guests; }
+    }
 
     document.getElementById('openError').classList.add('hidden');
     renderOpenForm();
+    renderResBanner();
     document.getElementById('openForm').classList.remove('hidden');
   }
+
+  // Khung "Khách đã đặt bàn này" ở đầu form mở bàn
+  function renderResBanner() {
+    const box = document.getElementById('resBanner');
+    const mine = RES.filter(x => x.table_id === CUR_TABLE.id);
+    const line = r => `<b>${esc(r.customer_name)}</b> · <a href="tel:${esc(r.phone)}" class="underline">${esc(r.phone)}</a> · đặt ${esc(r.time)} · ${r.guests} khách`
+                      + (r.note ? `<div class="text-xs text-sky-200/80 mt-1"><i class="fa-regular fa-note-sticky mr-1"></i>${esc(r.note)}</div>` : '');
+
+    if (openForm.res) {
+      box.innerHTML = `
+        <div class="rounded-2xl border-2 border-sky-500 bg-sky-950/60 p-4">
+          <div class="text-[11px] font-black tracking-widest text-sky-300 uppercase mb-1"><i class="fa-solid fa-check mr-1"></i>Mở bàn cho khách đã đặt trước</div>
+          <div class="text-sm text-sky-100">${line(openForm.res)}</div>
+          <button onclick="clearRes()" class="mt-3 text-xs font-bold text-sky-300 underline">Không phải khách này (khách vãng lai)</button>
+        </div>`;
+    } else if (mine.length) {
+      box.innerHTML = `
+        <div class="rounded-2xl border-2 border-sky-700 bg-sky-950/40 p-4 space-y-3">
+          <div class="text-[11px] font-black tracking-widest text-sky-300 uppercase"><i class="fa-regular fa-calendar-check mr-1"></i>Bàn này có khách đặt hôm nay</div>
+          ${mine.map(r => `
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-sm text-sky-100 min-w-0">${line(r)}</div>
+              <button onclick="chooseRes(${r.id})" class="shrink-0 px-4 py-2 rounded-xl bg-sky-500 text-slate-950 font-black text-xs">KHÁCH NÀY ĐÃ ĐẾN</button>
+            </div>`).join('')}
+        </div>`;
+    } else {
+      box.innerHTML = '';
+    }
+    box.classList.toggle('hidden', !box.innerHTML);
+  }
+
+  function chooseRes(id) {
+    const r = RES.find(x => x.id === id);
+    if (!r) return;
+    openForm.res = r; openForm.guests = r.guests;
+    renderOpenForm(); renderResBanner();
+  }
+  function clearRes() { openForm.res = null; renderOpenForm(); renderResBanner(); }
 
   function changeGuests(d) {
     openForm.guests = Math.max(1, Math.min(60, openForm.guests + d));
@@ -489,22 +645,28 @@
     const err = document.getElementById('openError');
     err.classList.add('hidden');
 
-    const r = await api('/api/orders/open', {
+    const body = {
       table_id: CUR_TABLE.id,
       staff_id: STAFF_ID,
       guests: openForm.guests,
       package_id: openForm.food,
       drink_package_id: openForm.drink
-    });
+    };
+    // khách đã đặt bàn: mở bàn + đánh dấu "Đã đến" trong cùng một lần
+    const r = openForm.res
+      ? await api('/api/reservations/' + openForm.res.id + '/seat', body)
+      : await api('/api/orders/open', body);
 
     if (!r.success) {
       err.textContent = r.message;
       err.classList.remove('hidden');
+      if (openForm.res) loadReservations();      // có thể đơn đó vừa đổi trạng thái -> lấy danh sách mới
       return;
     }
 
     ORDER = r.order;
-    toast('Đã mở bàn ' + CUR_TABLE.id, true);
+    toast('Đã mở bàn ' + CUR_TABLE.id + (openForm.res ? ' cho khách ' + openForm.res.customer_name : ''), true);
+    if (openForm.res) loadReservations();
     refreshTables();
     showOrderView();
   }
@@ -518,6 +680,8 @@
     document.getElementById('orderView').classList.remove('hidden');
     document.getElementById('changeBtn').classList.remove('hidden');
     document.getElementById('qrBtn').classList.remove('hidden');
+    document.getElementById('moveBtn').classList.remove('hidden');
+    document.getElementById('mergeBtn').classList.remove('hidden');
 
     // tab mặc định
     tab = ORDER.package_id ? 'food' : (ORDER.drink_package_id ? 'drink' : 'alacarte');
@@ -542,7 +706,13 @@
     if (ORDER.drink_name) {
       chips.push(`<span class="px-2.5 py-0.5 rounded-full bg-sky-950/70 border border-sky-800/50 text-sky-300 text-[11px] font-bold">${esc(ORDER.drink_name)}</span>`);
     }
+    if (ORDER.package_id || ORDER.drink_package_id) {
+      chips.push(ORDER.seconds_left != null
+        ? `<span class="tm px-2.5 py-0.5 rounded-full bg-slate-800 text-[11px] font-bold" data-end="${Date.now() + ORDER.seconds_left * 1000}"></span>`
+        : '<span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[11px] font-bold"><i class="fa-regular fa-clock mr-1"></i>Chưa tính giờ</span>');
+    }
     document.getElementById('mOrderInfo').innerHTML = chips.join('');
+    tickTimers();
   }
 
   function renderTabs() {
@@ -683,7 +853,7 @@
       }
       CART.push({
         key: key, type: item.type, id: item.id, name: item.name,
-        price: item.price, qty: 1, choices: choices, choiceText: choiceText
+        price: item.price, qty: 1, choices: choices, choiceText: choiceText, note: ''
       });
     }
     renderCart();
@@ -698,6 +868,29 @@
     if (line.qty > 99) line.qty = 99;
     renderCart();
     renderMenu();
+  }
+
+  // ---- ghi chú cho bếp (mỗi dòng trong giỏ có 1 ô ghi chú + vài gợi ý bấm nhanh) ----
+  const NOTE_CHIPS = ['Không cay', 'Ít cay', 'Chín kỹ', 'Tái vừa', 'Không hành'];
+  function noteBox(c) {
+    return `<div class="mt-2">
+      <input data-note-key="${esc(c.key)}" value="${esc(c.note || '')}" maxlength="200" autocomplete="off"
+        oninput="setNote(this.dataset.noteKey, this.value)" placeholder="Ghi chú cho bếp (vd: không cay, nướng chín kỹ)"
+        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 focus:border-amber-500 outline-none text-xs">
+      <div class="flex flex-wrap gap-1.5 mt-1.5">${NOTE_CHIPS.map(t =>
+        `<button type="button" data-key="${esc(c.key)}" data-text="${esc(t)}" onclick="addNoteChip(this.dataset.key, this.dataset.text)"
+           class="px-2 py-1 rounded-full bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-[10px] font-bold transition">${esc(t)}</button>`).join('')}</div>
+    </div>`;
+  }
+  function setNote(key, v) { const l = CART.find(c => c.key === key); if (l) l.note = String(v).slice(0, 200); }
+  function addNoteChip(key, text) {
+    const l = CART.find(c => c.key === key); if (!l) return;
+    const parts = (l.note || '').split(',').map(s => s.trim()).filter(Boolean);
+    const i = parts.indexOf(text);
+    if (i >= 0) parts.splice(i, 1); else parts.push(text);          // bấm lần nữa để bỏ
+    l.note = parts.join(', ').slice(0, 200);
+    const inp = [...document.querySelectorAll('#cartList input[data-note-key]')].find(x => x.dataset.noteKey === key);
+    if (inp) inp.value = l.note;
   }
 
   function renderCart() {
@@ -717,6 +910,7 @@
             <button data-key="${esc(c.key)}" onclick="changeQty(this.dataset.key, 1)" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 font-black">+</button>
           </div>
         </div>
+        ${noteBox(c)}
       </div>`).join('')
       : '<p class="text-xs text-slate-600">Chưa chọn món. Bấm vào món bên trái để thêm.</p>';
 
@@ -791,7 +985,7 @@
     btn.disabled = true;
 
     const r = await api('/api/orders/' + ORDER.id + '/items', {
-      items: CART.map(c => ({ type: c.type, id: c.id, qty: c.qty, choices: c.choices }))
+      items: CART.map(c => ({ type: c.type, id: c.id, qty: c.qty, choices: c.choices, note: (c.note || '').trim() }))
     });
 
     if (!r.success) {
@@ -802,6 +996,7 @@
 
     CART = [];
     ORDER = r.order;
+    renderOrderInfo();                 // món đầu tiên vừa gửi -> bắt đầu đếm giờ
     toast('Đã gửi món xuống bếp', true);
     renderCart();
     renderMenu();
@@ -859,6 +1054,7 @@
               <div class="text-[11px] text-slate-500">
                 ${esc(i.time)}${i.unit_price ? ' · ' + money(i.unit_price * i.qty) : ''}${isCombo ? ' · combo' : ''}
               </div>
+              ${i.note ? `<div class="text-[11px] text-amber-300 mt-0.5"><i class="fa-regular fa-note-sticky mr-1"></i>${esc(i.note)}</div>` : ''}
             </div>
             ${statusChip(status)}
           </div>
@@ -878,6 +1074,159 @@
     ORDER = r.order;
     renderSent();
     toast('Đã huỷ món', true);
+  }
+
+
+  // ============ ĐẶT BÀN HÔM NAY: khách đến -> mở bàn ============
+  async function loadReservations() {
+    const r = await api('/api/reservations/today?staff=' + encodeURIComponent(STAFF_ID));
+    if (!r.success) return;
+    RES = r.reservations || [];
+    const b = document.getElementById('resBadge');
+    b.textContent = RES.length;
+    b.classList.toggle('hidden', !RES.length);
+    if (!document.getElementById('resModal').classList.contains('hidden')) renderResList();
+  }
+
+  function openResPanel() {
+    RES_PICK = null;
+    document.getElementById('resModal').classList.remove('hidden');
+    renderResList();
+    loadReservations();
+  }
+  function closeResPanel() { document.getElementById('resModal').classList.add('hidden'); }
+
+  function renderResList() {
+    const box = document.getElementById('resList');
+    if (!RES.length) {
+      box.innerHTML = '<div class="text-sm text-slate-400 text-center py-8">Hôm nay không còn đơn đặt bàn nào đang chờ khách đến.</div>';
+      return;
+    }
+    box.innerHTML = RES.map(function(r) {
+      const late = r.minutes_late;
+      const when = late > 15 ? `<span class="text-red-400 font-black">trễ ${late} phút</span>`
+                 : late > 0  ? `<span class="text-amber-300 font-bold">trễ ${late} phút</span>`
+                 : late > -60 ? `<span class="text-emerald-300 font-bold">còn ${-late} phút</span>`
+                 : '';
+      const where = (r.type === 'VIP' ? 'Phòng VIP ' : 'Bàn ') + esc(r.table_id) + ' · tầng ' + r.floor;
+      let action;
+      if (!r.table_busy) {
+        action = `<button onclick="seatRes(${r.id}, '${esc(r.table_id)}')" class="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs">KHÁCH ĐÃ ĐẾN</button>`;
+      } else {
+        action = `<div class="text-xs text-amber-300 font-bold mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${where} đang có khách</div>
+                  <button onclick="toggleResPick(${r.id})" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 font-black text-xs">
+                    ${RES_PICK === r.id ? 'ĐÓNG' : 'CHỌN BÀN KHÁC CHO KHÁCH'}</button>`;
+      }
+      let pick = '';
+      if (RES_PICK === r.id) {
+        const free = TABLES.filter(t => !t.order_id && t.id !== r.table_id);
+        pick = '<div class="mt-3 flex flex-wrap gap-2">' + (free.length ? free.map(t => {
+          const small = t.type === 'VIP' ? r.guests < (t.min_capacity || 1) : r.guests > t.capacity;
+          return `<button onclick="seatRes(${r.id}, '${esc(t.id)}')"
+                    class="px-3 py-2 rounded-xl border-2 ${small ? 'border-amber-700' : 'border-slate-600'} bg-slate-900 hover:border-sky-400 text-center">
+                    <div class="font-black text-sm">${esc(t.id)}</div>
+                    <div class="text-[10px] ${small ? 'text-amber-300' : 'text-slate-400'}">${t.type === 'VIP' ? 'VIP' : t.capacity + ' chỗ'}${small ? ' · lệch số khách' : ''}${t.res_time ? ' · đặt ' + esc(t.res_time) : ''}</div>
+                  </button>`;
+        }).join('') : '<div class="text-xs text-slate-400">Hiện không còn bàn trống.</div>') + '</div>';
+      }
+      return `
+        <div class="rounded-2xl border ${r.table_busy ? 'border-amber-700/60' : 'border-slate-700'} bg-slate-950/60 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-2xl font-black text-sky-300">${esc(r.time)}</span>
+                <span class="font-black text-white truncate">${esc(r.customer_name)}</span>
+                ${r.status === 'PENDING' ? '<span class="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-bold text-slate-300">Chưa xác nhận</span>' : ''}
+                <span class="text-xs">${when}</span>
+              </div>
+              <div class="text-xs text-slate-400 mt-1">
+                <i class="fa-solid fa-users mr-1"></i>${r.guests} khách · ${where} ·
+                <a href="tel:${esc(r.phone)}" class="underline">${esc(r.phone)}</a>
+              </div>
+              ${r.note ? `<div class="text-xs text-slate-300 mt-1"><i class="fa-regular fa-note-sticky mr-1 text-amber-400"></i>${esc(r.note)}</div>` : ''}
+            </div>
+            <div class="shrink-0 text-right">${action}</div>
+          </div>
+          ${pick}
+        </div>`;
+    }).join('');
+  }
+
+  function toggleResPick(id) { RES_PICK = (RES_PICK === id) ? null : id; renderResList(); }
+
+  // Bấm "Khách đã đến": mở form mở bàn của bàn đó, điền sẵn khách đặt trước
+  function seatRes(rid, tableId) {
+    closeResPanel();
+    PRE_RES = rid;
+    openTable(tableId);
+  }
+
+
+  // ============ CHUYỂN BÀN / GỘP BÀN ============
+  async function showTblModal(mode) {
+    if (!ORDER || !CUR_TABLE) return;
+    tblMode = mode; tblPick = null;
+    document.getElementById('tblError').classList.add('hidden');
+    await refreshTables();                                   // trạng thái bàn mới nhất
+    CUR_TABLE = TABLES.find(x => x.id === CUR_TABLE.id) || CUR_TABLE;
+    document.getElementById('tblTitle').innerHTML = mode === 'move'
+      ? '<i class="fa-solid fa-right-left mr-2 text-violet-400"></i>Chuyển bàn ' + esc(CUR_TABLE.id) + ' sang bàn trống'
+      : '<i class="fa-solid fa-object-group mr-2 text-emerald-400"></i>Gộp bàn khác vào bàn ' + esc(CUR_TABLE.id);
+    document.getElementById('tblDesc').textContent = mode === 'move'
+      ? 'Món đã gọi, vé buffet, số khách và đồng hồ 120 phút giữ nguyên; bàn cũ trở về trống.'
+      : 'Toàn bộ món và số khách của bàn được chọn sẽ nhập vào bàn ' + CUR_TABLE.id + ', bàn đó trở về trống. Chỉ gộp được hai bàn dùng cùng vé buffet. Giờ gọi món tính theo món đầu tiên của cả hai bàn.';
+    renderTblList();
+    document.getElementById('tblModal').classList.remove('hidden');
+  }
+
+  function renderTblList() {
+    const same = t => t.package_id === ORDER.package_id && t.drink_package_id === ORDER.drink_package_id;
+    const html = [1, 2].map(function(floor) {
+      const list = TABLES.filter(t => t.floor === floor && t.id !== CUR_TABLE.id
+                                   && (tblMode === 'move' ? !t.order_id : !!t.order_id));
+      if (!list.length) return '';
+      const chips = list.map(function(t) {
+        let sub, disabled = false;
+        if (tblMode === 'move') {
+          const small = t.type === 'VIP' ? ORDER.guests < (t.min_capacity || 1) : ORDER.guests > t.capacity;
+          sub = (t.type === 'VIP' ? 'VIP' : t.capacity + ' chỗ') + (small ? ' · lệch số khách' : '') + (t.res_time ? ' · đặt ' + t.res_time : '');
+        } else {
+          disabled = !same(t);
+          sub = t.guests + ' khách' + (disabled ? ' · khác vé buffet' : '');
+        }
+        return chipHtml(esc(t.id), sub, tblPick === t.id, `pickTbl('${esc(t.id)}')`, disabled);
+      }).join('');
+      return `<div><h5 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Tầng ${floor}</h5>
+              <div class="flex flex-wrap gap-3">${chips}</div></div>`;
+    }).join('');
+    document.getElementById('tblList').innerHTML = html ||
+      '<div class="text-sm text-slate-400 py-4">' + (tblMode === 'move' ? 'Hiện không còn bàn trống nào.' : 'Không có bàn nào khác đang có khách.') + '</div>';
+  }
+
+  function pickTbl(id) { tblPick = id; renderTblList(); }
+  function closeTblModal() { document.getElementById('tblModal').classList.add('hidden'); }
+
+  async function submitTbl() {
+    const err = document.getElementById('tblError');
+    err.classList.add('hidden');
+    if (!tblPick) { err.textContent = 'Hãy chọn một bàn.'; err.classList.remove('hidden'); return; }
+
+    const url = '/api/orders/' + ORDER.id + (tblMode === 'move' ? '/move' : '/merge');
+    const r = await api(url, tblMode === 'move' ? { to_table_id: tblPick } : { from_table_id: tblPick });
+    if (!r.success) { err.textContent = r.message; err.classList.remove('hidden'); renderTblList(); return; }
+
+    closeTblModal();
+    const from = tblPick;
+    ORDER = r.order;
+    await refreshTables();
+    CUR_TABLE = TABLES.find(x => x.id === ORDER.table_id) || CUR_TABLE;
+    document.getElementById('mTableId').textContent = CUR_TABLE.id;
+    document.getElementById('mTableInfo').textContent =
+      'Tầng ' + CUR_TABLE.floor + ' · ' + (CUR_TABLE.type === 'VIP' ? 'Phòng VIP' : CUR_TABLE.capacity + ' chỗ');
+    renderOrderInfo(); renderSent();
+    toast(tblMode === 'move'
+      ? 'Đã chuyển sang bàn ' + CUR_TABLE.id + ((r.warnings || []).length ? '. Lưu ý: ' + r.warnings.join(' ') : '')
+      : 'Đã gộp bàn ' + from + ' vào bàn ' + CUR_TABLE.id + ' (' + ORDER.guests + ' khách)', true);
   }
 
 
@@ -981,6 +1330,7 @@
       const r = await api('/api/orders/' + ORDER.id);
       if (r.success && r.order && r.order.status === 'OPEN') {
         ORDER = r.order;
+        renderOrderInfo();
         renderSent();
       } else if (r.success && r.order) {
         toast('Bàn ' + CUR_TABLE.id + ' đã được thanh toán', true);
@@ -1032,6 +1382,10 @@
 
   // ============ KHỞI TẠO ============
   setFloor('all');
+  refreshTables();                       // lấy thêm thông tin đồng hồ của từng bàn
+  setInterval(tickTimers, 1000);
+  loadReservations();                    // số đơn đặt bàn hôm nay (hiện ở nút ĐẶT BÀN HÔM NAY)
+  setInterval(loadReservations, 30000);
 </script>
 
 </body>
