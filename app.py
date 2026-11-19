@@ -12,10 +12,23 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from db import query, transaction
 
+
+
+def secret_env(name, dev_default):
+    """Đọc bí mật (khoá phiên, mật khẩu quầy...) từ biến môi trường.
+    - Trên Render (có biến RENDER): BẮT BUỘC đã đặt, thiếu thì không cho chạy để khỏi dùng nhầm mật khẩu mặc định yếu.
+    - Chạy trên máy cá nhân: thiếu thì dùng giá trị dev_default để thử cho tiện."""
+    val = os.environ.get(name)
+    if val:
+        return val
+    if os.environ.get('RENDER'):
+        raise RuntimeError(f"Thiếu biến môi trường {name}. Vào Render > Environment để đặt trước khi chạy.")
+    return dev_default
+
+
 app = Flask(__name__)
 # Khoá bí mật để Flask ký cookie đăng nhập. Trên Render: Environment > thêm SECRET_KEY = một chuỗi dài ngẫu nhiên.
-# (Không đặt thì dùng khoá tạm bên dưới - chạy được nhưng kém an toàn.)
-app.secret_key = os.environ.get('SECRET_KEY') or 'gyusachi-do-an-tot-nghiep'
+app.secret_key = secret_env('SECRET_KEY', 'khoa-tam-chi-dung-khi-chay-may-ca-nhan')
 app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=14),     # đăng nhập giữ trong 1 ca, không phải đăng nhập lại liên tục
     SESSION_COOKIE_HTTPONLY=True,                       # JavaScript không đọc được cookie đăng nhập
@@ -975,7 +988,7 @@ def api_kitchen_status(item_id):
 # =========================================================
 # Chỉnh các hằng số này khi nhà hàng đổi chính sách.
 
-CASHIER_PASSWORD = os.environ.get('CASHIER_PIN', '1234')                                # mật khẩu quầy thu ngân
+CASHIER_PASSWORD = secret_env('CASHIER_PIN', '1234')                                # mật khẩu quầy thu ngân
 VAT_RATE = 0.08                                          # VAT 8%
 LUNCH_END_HOUR = 15                                      # mở bàn trước 15:00 là buffet trưa
 GROUP_SIZE = 4                                           # đi 4 ...
@@ -1386,7 +1399,7 @@ def api_cashier_history():
 # 8C. QUẢN LÍ — DASHBOARD, BÁO CÁO, THỐNG KÊ MÓN, THỰC ĐƠN
 # =========================================================
 
-MANAGER_PASSWORD = os.environ.get('MANAGER_PIN', '88889999')                            # mật khẩu phân hệ quản lí
+MANAGER_PASSWORD = secret_env('MANAGER_PIN', '88889999')                            # mật khẩu phân hệ quản lí
 
 PAID = "o.status = 'CLOSED' AND o.paid_at IS NOT NULL AND o.voided_at IS NULL"   # hoá đơn đã thanh toán và chưa bị huỷ
 
